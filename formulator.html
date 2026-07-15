@@ -123,6 +123,21 @@
       margin: 0;
     }
 
+    .size-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .size-row input[type="number"] {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .size-row select {
+      width: 68px;
+      flex: none;
+    }
+
     input[type="number"],
     select {
       padding: 8px 10px;
@@ -298,8 +313,15 @@
           </select>
         </div>
         <div class="option">
-          <label for="fontsize">Schriftgröße (px)</label>
-          <input type="number" id="fontsize" value="48" min="8" max="400" step="1">
+          <label for="fontsize">Schriftgröße</label>
+          <div class="size-row">
+            <input type="number" id="fontsize" value="48" min="8" max="400" step="1">
+            <select id="exportunit" title="Einheit für width/height beim SVG-Export">
+              <option value="px" selected>px</option>
+              <option value="em">em</option>
+              <option value="pt">pt</option>
+            </select>
+          </div>
         </div>
         <div class="option">
           <label for="color">Textfarbe</label>
@@ -325,6 +347,10 @@
 
       <p class="hint" id="darkmodeHint" hidden>
         Das SVG passt sich per <code>prefers-color-scheme</code> automatisch der Systemeinstellung an. Hintergrund bleibt dafür transparent. Bei Websites mit manuellem Dark-Mode-Schalter (statt Systemvorgabe) muss das SVG inline ins HTML eingebettet werden, nicht per &lt;img&gt;.
+      </p>
+
+      <p class="hint" id="relativesizeHint" hidden>
+        <code>width</code>/<code>height</code> werden relativ zur oben eingestellten Schriftgröße in <code>em</code> statt in festen Pixeln geschrieben. Dadurch skaliert die Formel automatisch mit der Schriftgröße, wenn das SVG-Markup direkt (inline) ins HTML eingebettet wird. Bei Einbindung per <code>&lt;img src="..."&gt;</code> greift das nicht &ndash; dort stattdessen im Stylesheet der Seite z.&nbsp;B. <code>img.formula { height: 1.1em; width: auto; }</code> setzen.
       </p>
 
       <div class="error" id="error"></div>
@@ -361,6 +387,8 @@
     const darkmodeEl = document.getElementById('darkmode');
     const darkcolorEl = document.getElementById('darkcolor');
     const darkmodeHintEl = document.getElementById('darkmodeHint');
+    const exportUnitEl = document.getElementById('exportunit');
+    const relativesizeHintEl = document.getElementById('relativesizeHint');
     const previewToggleEl = document.getElementById('previewToggle');
     const previewEl = document.getElementById('preview');
     const previewWrapEl = document.getElementById('previewWrap');
@@ -461,13 +489,34 @@
       renderTimer = setTimeout(render, 200);
     }
 
+    function trimNum(n) {
+      return n.toFixed(4).replace(/\.?0+$/, '');
+    }
+
     function buildExportSvg() {
       if (!currentSvg) return null;
       const clone = currentSvg.cloneNode(true);
       const rect = currentSvg.getBoundingClientRect();
 
-      clone.setAttribute('width', rect.width.toFixed(2));
-      clone.setAttribute('height', rect.height.toFixed(2));
+      if (exportUnitEl.value === 'em') {
+        // Express width/height relative to the configured preview font size (in em)
+        // instead of fixed pixels, so the formula scales with the surrounding text's
+        // font size when the SVG markup is embedded inline in HTML. (Has no effect
+        // when referenced via <img src="...">, since that isolates the SVG's CSS
+        // context — use CSS on the <img> element itself for that case instead.)
+        const basePx = parseFloat(fontsizeEl.value) || 16;
+        clone.setAttribute('width', trimNum(rect.width / basePx) + 'em');
+        clone.setAttribute('height', trimNum(rect.height / basePx) + 'em');
+      } else if (exportUnitEl.value === 'pt') {
+        // Absolute unit like px, just in points (1px = 0.75pt at the standard 96dpi
+        // CSS reference). Mainly useful for importing into print/design tools (e.g.
+        // Affinity Designer) that work in points rather than pixels.
+        clone.setAttribute('width', trimNum(rect.width * 0.75) + 'pt');
+        clone.setAttribute('height', trimNum(rect.height * 0.75) + 'pt');
+      } else {
+        clone.setAttribute('width', rect.width.toFixed(2));
+        clone.setAttribute('height', rect.height.toFixed(2));
+      }
       // MathJax itself already stamps plain "xmlns" and "xmlns:xlink" attributes onto
       // the root <svg> (see output/svg.ts). Those are ordinary attributes, not real
       // namespace declarations, so the XML serializer doesn't recognize them and adds
@@ -553,6 +602,11 @@
 
     darkmodeEl.addEventListener('change', () => {
       updateDarkModeUI();
+      setStatus('');
+    });
+
+    exportUnitEl.addEventListener('change', () => {
+      relativesizeHintEl.hidden = exportUnitEl.value !== 'em';
       setStatus('');
     });
 
