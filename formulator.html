@@ -468,9 +468,17 @@
 
       clone.setAttribute('width', rect.width.toFixed(2));
       clone.setAttribute('height', rect.height.toFixed(2));
-      // Use real namespace-declaration attributes (not plain setAttribute) so the
-      // serializer recognizes them and keeps the "xlink" prefix on <use xlink:href>
-      // instead of inventing an ns1 prefix, and doesn't duplicate the default xmlns.
+      // MathJax itself already stamps plain "xmlns" and "xmlns:xlink" attributes onto
+      // the root <svg> (see output/svg.ts). Those are ordinary attributes, not real
+      // namespace declarations, so the XML serializer doesn't recognize them and adds
+      // its own — resulting in duplicate xmlns/xmlns:xlink attributes and invalid XML
+      // (which is why the exported file failed to open in browsers/Affinity Designer).
+      // Strip MathJax's copies first, then declare xmlns:xlink properly via setAttributeNS
+      // so the serializer keeps the "xlink" prefix on <use xlink:href> instead of
+      // inventing an ns1 prefix. The default xmlns is handled automatically by the
+      // serializer once the stray plain attribute is gone.
+      clone.removeAttribute('xmlns');
+      clone.removeAttribute('xmlns:xlink');
       clone.setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:xlink', 'http://www.w3.org/1999/xlink');
       clone.removeAttribute('style');
 
