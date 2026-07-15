@@ -10,6 +10,8 @@ Type something like:
 
 … and get a clean, scalable vector graphic you can drop into a slide deck, a blog post, or a design tool.
 
+Not sure what LaTeX syntax is supported? See MathJax's [supported TeX/LaTeX commands](https://docs.mathjax.org/en/latest/input/tex/macros/index.html) reference.
+
 ## Features
 
 - **Live preview** — renders as you type, powered by [MathJax](https://www.mathjax.org/) in SVG output mode (true vector paths, not HTML/CSS — so the exported file is portable and font-independent).
