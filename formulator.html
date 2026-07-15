@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Formulator — Formel zu SVG</title>
+  <script>
+    MathJax = {
+      tex: {
+        packages: { '[+]': ['ams', 'boldsymbol'] }
+      },
+      svg: {
+        fontCache: 'local',
+        scale: 1
+      },
+      startup: {
+        typeset: false
+      }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" id="mathjax-script"></script>
+  <style>
+    :root {
+      --bg: #f7f7f8;
+      --panel: #ffffff;
+      --border: #e2e2e6;
+      --text: #1c1c1f;
+      --muted: #6b6b74;
+      --accent: #3b5bfd;
+      --accent-hover: #2f49d1;
+      --error: #d13b3b;
+      --radius: 10px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      padding: 32px 16px;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 760px;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 600;
+      margin: 0 0 4px;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 14px;
+      margin: 0 0 24px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 90px;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 14px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      resize: vertical;
+      background: #fbfbfc;
+      color: var(--text);
+    }
+
+    textarea:focus,
+    input:focus,
+    select:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+
+    .options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .option {
+      display: flex;
+      flex-direction: column;
+      min-width: 130px;
+    }
+
+    .option.inline {
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .option.inline label {
+      margin: 0;
+    }
+
+    input[type="number"],
+    select {
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      background: #fbfbfc;
+      color: var(--text);
+    }
+
+    input[type="color"] {
+      width: 42px;
+      height: 34px;
+      padding: 2px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fbfbfc;
+    }
+
+    input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+    }
+
+    .preview-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 140px;
+      padding: 24px;
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      overflow: auto;
+      background: repeating-conic-gradient(#f0f0f2 0% 25%, #fafafb 0% 50%) 50% / 20px 20px;
+    }
+
+    .preview-wrap.opaque-bg {
+      background: var(--preview-bg, #ffffff);
+    }
+
+    .preview-wrap.dark-test {
+      background: repeating-conic-gradient(#2a2a2e 0% 25%, #1c1c1f 0% 50%) 50% / 20px 20px;
+    }
+
+    #preview svg {
+      display: block;
+      max-width: 100%;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .panel-header label {
+      margin-bottom: 0;
+    }
+
+    .toggle-group {
+      display: flex;
+      gap: 2px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2px;
+    }
+
+    .toggle-group button {
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .toggle-group button.active {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .hint {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 10px;
+      line-height: 1.5;
+    }
+
+    .error {
+      color: var(--error);
+      font-size: 13px;
+      margin-top: 10px;
+      display: none;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      appearance: none;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    button.primary:hover {
+      background: var(--accent-hover);
+    }
+
+    button.secondary {
+      background: #fff;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    button.secondary:hover {
+      background: #f2f2f4;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .status {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    .status.copied {
+      color: var(--accent);
+    }
+
+    footer {
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 24px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <h1>Formulator</h1>
+    <p class="subtitle">LaTeX-Formel eingeben, live als SVG rendern und herunterladen.</p>
+
+    <div class="panel">
+      <label for="formula">LaTeX-Formel</label>
+      <textarea id="formula" spellcheck="false">\int_{-\infty}^{\infty} e^{-x^2}\,dx = \sqrt{\pi}</textarea>
+
+      <div class="options">
+        <div class="option">
+          <label for="mode">Modus</label>
+          <select id="mode">
+            <option value="display" selected>Display</option>
+            <option value="inline">Inline</option>
+          </select>
+        </div>
+        <div class="option">
+          <label for="fontsize">Schriftgröße (px)</label>
+          <input type="number" id="fontsize" value="48" min="8" max="400" step="1">
+        </div>
+        <div class="option">
+          <label for="color">Textfarbe</label>
+          <input type="color" id="color" value="#1c1c1f">
+        </div>
+        <div class="option">
+          <label for="bgcolor">Hintergrundfarbe</label>
+          <input type="color" id="bgcolor" value="#ffffff">
+        </div>
+        <div class="option inline">
+          <input type="checkbox" id="bgtoggle">
+          <label for="bgtoggle" style="margin:0;">Hintergrund einfügen</label>
+        </div>
+        <div class="option">
+          <label for="darkcolor">Farbe (Dark Mode)</label>
+          <input type="color" id="darkcolor" value="#f0f0f0" disabled>
+        </div>
+        <div class="option inline">
+          <input type="checkbox" id="darkmode" aria-checked="true" checked>
+          <label for="darkmode" style="margin:0;">Dark-Mode-fähig exportieren</label>
+        </div>
+      </div>
+
+      <p class="hint" id="darkmodeHint" hidden>
+        Das SVG passt sich per <code>prefers-color-scheme</code> automatisch der Systemeinstellung an. Hintergrund bleibt dafür transparent. Bei Websites mit manuellem Dark-Mode-Schalter (statt Systemvorgabe) muss das SVG inline ins HTML eingebettet werden, nicht per &lt;img&gt;.
+      </p>
+
+      <div class="error" id="error"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <label style="margin:0;">Vorschau</label>
+        <div class="toggle-group" id="previewToggle" hidden>
+          <button type="button" class="active" data-mode="light">Hell</button>
+          <button type="button" data-mode="dark">Dunkel</button>
+        </div>
+      </div>
+      <div class="preview-wrap" id="previewWrap">
+        <div id="preview"></div>
+      </div>
+      <div class="actions">
+        <button class="primary" id="downloadBtn">SVG herunterladen</button>
+        <button class="secondary" id="copyBtn">SVG-Code kopieren</button>
+      </div>
+      <div class="status" id="status"></div>
+    </div>
+
+    <footer>Rendering via MathJax (SVG-Ausgabe) — läuft vollständig im Browser, keine Server-Anfrage nötig.</footer>
+  </div>
+
+  <script>
+    const formulaEl = document.getElementById('formula');
+    const modeEl = document.getElementById('mode');
+    const fontsizeEl = document.getElementById('fontsize');
+    const colorEl = document.getElementById('color');
+    const bgcolorEl = document.getElementById('bgcolor');
+    const bgtoggleEl = document.getElementById('bgtoggle');
+    const darkmodeEl = document.getElementById('darkmode');
+    const darkcolorEl = document.getElementById('darkcolor');
+    const darkmodeHintEl = document.getElementById('darkmodeHint');
+    const previewToggleEl = document.getElementById('previewToggle');
+    const previewEl = document.getElementById('preview');
+    const previewWrapEl = document.getElementById('previewWrap');
+    const errorEl = document.getElementById('error');
+    const statusEl = document.getElementById('status');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const copyBtn = document.getElementById('copyBtn');
+
+    let currentSvg = null;
+    let renderTimer = null;
+    let previewMode = 'light';
+
+    function setError(msg) {
+      if (msg) {
+        errorEl.textContent = msg;
+        errorEl.style.display = 'block';
+      } else {
+        errorEl.style.display = 'none';
+        errorEl.textContent = '';
+      }
+    }
+
+    function setStatus(msg, copied) {
+      statusEl.textContent = msg || '';
+      statusEl.classList.toggle('copied', !!copied);
+    }
+
+    function setPreviewModeButtons() {
+      previewToggleEl.querySelectorAll('button').forEach(b => {
+        b.classList.toggle('active', b.dataset.mode === previewMode);
+      });
+    }
+
+    function updateDarkModeUI() {
+      const active = darkmodeEl.checked;
+      darkcolorEl.disabled = !active;
+      previewToggleEl.hidden = !active;
+      darkmodeHintEl.hidden = !active;
+      bgtoggleEl.disabled = active;
+      if (active) {
+        bgtoggleEl.checked = false;
+      } else {
+        previewMode = 'light';
+        setPreviewModeButtons();
+      }
+      updatePreviewChrome();
+    }
+
+    function updatePreviewChrome() {
+      const darkPreview = darkmodeEl.checked && previewMode === 'dark';
+      previewWrapEl.classList.toggle('opaque-bg', bgtoggleEl.checked && !darkmodeEl.checked);
+      previewWrapEl.classList.toggle('dark-test', darkPreview);
+      previewWrapEl.style.setProperty('--preview-bg', bgcolorEl.value);
+      previewEl.style.fontSize = fontsizeEl.value + 'px';
+      previewEl.style.color = darkPreview ? darkcolorEl.value : colorEl.value;
+    }
+
+    async function render() {
+      const input = formulaEl.value.trim();
+      downloadBtn.disabled = true;
+      copyBtn.disabled = true;
+      currentSvg = null;
+
+      if (!input) {
+        previewEl.innerHTML = '';
+        setError('Bitte eine Formel eingeben.');
+        return;
+      }
+
+      if (typeof MathJax === 'undefined' || !MathJax.tex2svgPromise) {
+        setError('MathJax wird noch geladen …');
+        return;
+      }
+
+      try {
+        const display = modeEl.value === 'display';
+        const node = await MathJax.tex2svgPromise(input, { display });
+        const svg = node.querySelector('svg');
+        if (!svg) throw new Error('Kein SVG erzeugt.');
+
+        previewEl.innerHTML = '';
+        updatePreviewChrome();
+        previewEl.appendChild(svg);
+
+        currentSvg = svg;
+        setError(null);
+        setStatus('');
+        downloadBtn.disabled = false;
+        copyBtn.disabled = false;
+      } catch (err) {
+        previewEl.innerHTML = '';
+        setError('Fehler beim Rendern: ' + (err && err.message ? err.message : String(err)));
+      }
+    }
+
+    function scheduleRender() {
+      clearTimeout(renderTimer);
+      renderTimer = setTimeout(render, 200);
+    }
+
+    function buildExportSvg() {
+      if (!currentSvg) return null;
+      const clone = currentSvg.cloneNode(true);
+      const rect = currentSvg.getBoundingClientRect();
+
+      clone.setAttribute('width', rect.width.toFixed(2));
+      clone.setAttribute('height', rect.height.toFixed(2));
+      // Use real namespace-declaration attributes (not plain setAttribute) so the
+      // serializer recognizes them and keeps the "xlink" prefix on <use xlink:href>
+      // instead of inventing an ns1 prefix, and doesn't duplicate the default xmlns.
+      clone.setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:xlink', 'http://www.w3.org/1999/xlink');
+      clone.removeAttribute('style');
+
+      if (darkmodeEl.checked) {
+        clone.classList.add('formulator-formula');
+        const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+        style.textContent =
+          '.formulator-formula { color: ' + colorEl.value + '; }\n' +
+          '@media (prefers-color-scheme: dark) {\n' +
+          '  .formulator-formula { color: ' + darkcolorEl.value + '; }\n' +
+          '}';
+        clone.insertBefore(style, clone.firstChild);
+      } else {
+        clone.style.color = colorEl.value;
+        if (bgtoggleEl.checked) {
+          const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          bg.setAttribute('x', '0');
+          bg.setAttribute('y', '0');
+          bg.setAttribute('width', '100%');
+          bg.setAttribute('height', '100%');
+          bg.setAttribute('fill', bgcolorEl.value);
+          clone.insertBefore(bg, clone.firstChild);
+        }
+      }
+
+      const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+      title.textContent = formulaEl.value.trim();
+      clone.insertBefore(title, clone.firstChild);
+
+      return clone;
+    }
+
+    function serializeExportSvg(svgEl) {
+      const serializer = new XMLSerializer();
+      let source = serializer.serializeToString(svgEl);
+      return '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n' + source;
+    }
+
+    downloadBtn.addEventListener('click', () => {
+      const exportSvg = buildExportSvg();
+      if (!exportSvg) return;
+      const source = serializeExportSvg(exportSvg);
+      const blob = new Blob([source], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'formel.svg';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setStatus('SVG heruntergeladen.');
+    });
+
+    copyBtn.addEventListener('click', async () => {
+      const exportSvg = buildExportSvg();
+      if (!exportSvg) return;
+      const source = serializeExportSvg(exportSvg);
+      try {
+        await navigator.clipboard.writeText(source);
+        setStatus('SVG-Code in Zwischenablage kopiert.', true);
+      } catch (err) {
+        setStatus('Kopieren fehlgeschlagen — Zwischenablage nicht verfügbar.');
+      }
+    });
+
+    [formulaEl, modeEl].forEach(el => el.addEventListener('input', scheduleRender));
+    [fontsizeEl, colorEl, bgcolorEl, bgtoggleEl, darkcolorEl].forEach(el => el.addEventListener('input', () => {
+      updatePreviewChrome();
+      setStatus('');
+    }));
+
+    darkmodeEl.addEventListener('change', () => {
+      updateDarkModeUI();
+      setStatus('');
+    });
+
+    previewToggleEl.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-mode]');
+      if (!btn) return;
+      previewMode = btn.dataset.mode;
+      setPreviewModeButtons();
+      updatePreviewChrome();
+    });
+
+    MathJax.startup.promise.then(render);
+  </script>
+</body>
+
+</html>
