@@ -313,7 +313,7 @@
           </select>
         </div>
         <div class="option">
-          <label for="fontsize">Schriftgröße</label>
+          <label for="fontsize">Größe</label>
           <div class="size-row">
             <input type="number" id="fontsize" value="2" min="0.1" max="48" step="0.1">
             <select id="exportunit" title="Einheit für width/height beim SVG-Export">
@@ -372,6 +372,7 @@
       <div class="preview-wrap" id="previewWrap">
         <div id="preview"></div>
       </div>
+      <p class="hint" id="dimsReadout" style="margin-top: 8px;"></p>
       <div class="option inline" style="margin-top: 14px;">
         <input type="checkbox" id="noxmldecl" checked>
         <label for="noxmldecl" style="margin:0;">Keine XML-Deklaration voranstellen</label>
@@ -403,6 +404,7 @@
     const previewToggleEl = document.getElementById('previewToggle');
     const previewEl = document.getElementById('preview');
     const previewWrapEl = document.getElementById('previewWrap');
+    const dimsReadoutEl = document.getElementById('dimsReadout');
     const errorEl = document.getElementById('error');
     const statusEl = document.getElementById('status');
     const downloadBtn = document.getElementById('downloadBtn');
@@ -455,6 +457,21 @@
       previewWrapEl.style.setProperty('--preview-bg', bgcolorEl.value);
       previewEl.style.fontSize = fontsizeEl.value + 'px';
       previewEl.style.color = darkPreview ? darkcolorEl.value : colorEl.value;
+      updateDimsReadout();
+    }
+
+    function updateDimsReadout() {
+      if (!currentSvg) {
+        dimsReadoutEl.textContent = '';
+        return;
+      }
+      // Read the actually rendered pixel size, since the "Größe" field only sets the
+      // font-size that the formula's ex-based proportions scale from — the real
+      // rendered height (especially for tall formulas like integrals with limits)
+      // is usually a multiple of that value, not equal to it.
+      const rect = currentSvg.getBoundingClientRect();
+      dimsReadoutEl.textContent =
+        'Gerenderte Größe: ' + Math.round(rect.width) + ' × ' + Math.round(rect.height) + ' px';
     }
 
     async function render() {
@@ -462,6 +479,7 @@
       downloadBtn.disabled = true;
       copyBtn.disabled = true;
       currentSvg = null;
+      updateDimsReadout();
 
       if (!input) {
         previewEl.innerHTML = '';
@@ -481,10 +499,10 @@
         if (!svg) throw new Error('Kein SVG erzeugt.');
 
         previewEl.innerHTML = '';
-        updatePreviewChrome();
         previewEl.appendChild(svg);
-
         currentSvg = svg;
+        updatePreviewChrome();
+
         setError(null);
         setStatus('');
         downloadBtn.disabled = false;
