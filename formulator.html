@@ -67,6 +67,33 @@
       max-width: 760px;
     }
 
+    .app-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .lang-switch {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    .lang-switch select {
+      padding: 4px 8px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 13px;
+      background: #fbfbfc;
+      color: var(--text);
+    }
+
     h1 {
       font-size: 20px;
       font-weight: 600;
@@ -367,20 +394,29 @@
 
 <body>
   <div class="app">
-    <h1>Formulator</h1>
-    <p class="subtitle">LaTeX-Formel eingeben, live als SVG rendern und herunterladen</p>
+    <div class="app-header">
+      <h1>Formulator</h1>
+      <label class="lang-switch">
+        <span data-i18n="ui_language">Sprache</span>
+        <select id="uilang">
+          <option value="de" selected>Deutsch</option>
+          <option value="en">English</option>
+        </select>
+      </label>
+    </div>
+    <p class="subtitle" data-i18n="subtitle">LaTeX-Formel eingeben, live als SVG rendern und herunterladen</p>
 
     <div class="panel">
-      <label for="formula">LaTeX-Formel</label>
+      <label for="formula" data-i18n="label_formula">LaTeX-Formel</label>
       <textarea id="formula" spellcheck="false">\int_{-\infty}^{\infty} e^{-x^2}\,dx = \sqrt{\pi}</textarea>
 
-      <div class="ocr-zone" id="ocrZone" tabindex="0"
+      <div class="ocr-zone" id="ocrZone" tabindex="0" data-i18n-title="ocr_zone_title"
         title="Bild einer Formel hier ablegen, einfügen (Strg/Cmd+V) oder klicken zum Auswählen">
         <input type="file" id="ocrFile" accept="image/*" hidden>
         <div class="ocr-inner" id="ocrInner">
           <span class="ocr-icon" aria-hidden="true">🖼️➜ƒ(x)</span>
-          <span class="ocr-text">Formel-Bild hierher ziehen, einfügen (Strg/Cmd&nbsp;+&nbsp;V) oder klicken</span>
-          <span class="ocr-sub">wird lokal im Browser per Texo-Modell zu LaTeX erkannt</span>
+          <span class="ocr-text" data-i18n-html="ocr_text">Formel-Bild hierher ziehen, einfügen (Strg/Cmd&nbsp;+&nbsp;V) oder klicken</span>
+          <span class="ocr-sub" data-i18n="ocr_sub">wird lokal im Browser per Texo-Modell zu LaTeX erkannt</span>
         </div>
         <img id="ocrThumb" class="ocr-thumb" alt="" hidden>
       </div>
@@ -388,22 +424,22 @@
 
       <div class="options">
         <div class="option">
-          <label for="mode">Platzierung</label>
+          <label for="mode" data-i18n="label_placement">Platzierung</label>
           <select id="mode">
-            <option value="display" id="displayOption" selected>in separatem Absatz</option>
-            <option value="inline">im Fließtext</option>
+            <option value="display" id="displayOption" selected data-i18n="place_display">in separatem Absatz</option>
+            <option value="inline" data-i18n="place_inline">im Fließtext</option>
           </select>
         </div>
         <div class="option">
-          <label for="basesize">Standardschriftgröße (px)</label>
-          <input type="number" id="basesize" value="18" min="1" max="100" step="1"
+          <label for="basesize" data-i18n="label_basesize">Standardschriftgröße (px)</label>
+          <input type="number" id="basesize" value="18" min="1" max="100" step="1" data-i18n-title="basesize_title"
             title="Referenz für em/rem – z. B. die Standard-Schriftgröße deiner Zielseite. Bei px/pt ohne Bedeutung.">
         </div>
         <div class="option">
-          <label for="fontsize">Schriftgröße der Formel</label>
+          <label for="fontsize" data-i18n="label_fontsize">Schriftgröße der Formel</label>
           <div class="size-row">
             <input type="number" id="fontsize" value="1" min="0.1" max="500" step="0.1">
-            <select id="exportunit"
+            <select id="exportunit" data-i18n-title="exportunit_title"
               title="Einheit der Formel-Schriftgröße – bestimmt zugleich die Einheit von width/height im exportierten SVG.">
               <option value="em" selected>em</option>
               <option value="rem">rem</option>
@@ -413,45 +449,45 @@
           </div>
         </div>
         <div class="option">
-          <label for="color">Textfarbe</label>
+          <label for="color" data-i18n="label_color">Textfarbe</label>
           <input type="color" id="color" value="#000000">
         </div>
         <div class="option">
-          <label for="bgcolor">Hintergrundfarbe</label>
+          <label for="bgcolor" data-i18n="label_bgcolor">Hintergrundfarbe</label>
           <input type="color" id="bgcolor" value="#ffffff">
         </div>
         <div class="option inline">
           <input type="checkbox" id="bgtoggle">
-          <label for="bgtoggle">Hintergrund einfügen</label>
+          <label for="bgtoggle" data-i18n="label_bgtoggle">Hintergrund einfügen</label>
         </div>
         <div class="option">
-          <label for="darkcolor">Farbe (Dark Mode)</label>
+          <label for="darkcolor" data-i18n="label_darkcolor">Farbe (Dark Mode)</label>
           <input type="color" id="darkcolor" value="#ffffff" disabled>
         </div>
         <div class="option inline">
           <input type="checkbox" id="darkmode" aria-checked="true" checked>
-          <label for="darkmode">Dark-Mode-fähig exportieren</label>
+          <label for="darkmode" data-i18n="label_darkmode">Dark-Mode-fähig exportieren</label>
         </div>
         <div class="option">
-          <label for="speechlang">Vorlese-Sprache</label>
-          <select id="speechlang" title="Sprache des eingebetteten Vorlesetexts für Screenreader">
-            <option value="de" selected>Deutsch</option>
-            <option value="en">Englisch</option>
+          <label for="speechlang" data-i18n="label_speechlang">Vorlese-Sprache</label>
+          <select id="speechlang" data-i18n-title="speechlang_title" title="Sprache des eingebetteten Vorlesetexts für Screenreader">
+            <option value="de" data-i18n="lang_de">Deutsch</option>
+            <option value="en" data-i18n="lang_en">Englisch</option>
           </select>
         </div>
         <div class="option inline">
           <input type="checkbox" id="a11ytoggle" checked>
-          <label for="a11ytoggle">Vorlesetext für Screenreader einbetten</label>
+          <label for="a11ytoggle" data-i18n="label_a11y">Vorlesetext für Screenreader einbetten</label>
         </div>
       </div>
 
-      <p class="hint" id="darkmodeHint" hidden>
+      <p class="hint" id="darkmodeHint" data-i18n-html="hint_darkmode" hidden>
         Das SVG passt sich per <code>prefers-color-scheme</code> automatisch der Systemeinstellung an. Hintergrund
         bleibt dafür transparent. Bei Websites mit manuellem Dark-Mode-Schalter (statt Systemvorgabe) muss das SVG
         inline ins HTML eingebettet werden, nicht per &lt;img&gt;.
       </p>
 
-      <p class="hint" id="relativesizeHint" hidden>
+      <p class="hint" id="relativesizeHint" data-i18n-html="hint_relativesize" hidden>
         <code>width</code>/<code>height</code> werden relativ zur <em>Standardschriftgröße</em> geschrieben, statt in
         festen Pixeln. Ist das SVG-Markup direkt (inline) in eine Seite eingebettet, deren (Root-)Schriftgröße dieser
         Standardschriftgröße entspricht, erscheint die Formel genau so groß wie hier in der Vorschau und skaliert mit
@@ -459,7 +495,7 @@
         im Stylesheet der Seite z.&nbsp;B. <code>img.formula { height: 1.1em; width: auto; }</code> setzen.
       </p>
 
-      <p class="hint" id="remHint" hidden>
+      <p class="hint" id="remHint" data-i18n-html="hint_rem" hidden>
         Achtung: Firefox unterstützt <code>rem</code> als <code>width</code>/<code>height</code>-Einheit bei SVGs
         bislang nicht zuverlässig (Chrome, Safari und Edge schon). Für garantierte Kompatibilität <code>em</code> oder
         <code>px</code> verwenden.
@@ -470,10 +506,10 @@
 
     <div class="panel">
       <div class="panel-header">
-        <label>Vorschau</label>
+        <label data-i18n="label_preview">Vorschau</label>
         <div class="toggle-group" id="previewToggle" hidden>
-          <button type="button" class="active" data-mode="light">Hell</button>
-          <button type="button" data-mode="dark">Dunkel</button>
+          <button type="button" class="active" data-mode="light" data-i18n="toggle_light">Hell</button>
+          <button type="button" data-mode="dark" data-i18n="toggle_dark">Dunkel</button>
         </div>
       </div>
       <div class="preview-wrap" id="previewWrap">
@@ -483,16 +519,16 @@
       <p class="hint" id="speechReadout" style="margin-top: 4px;"></p>
       <div class="option inline" style="margin-top: 14px;">
         <input type="checkbox" id="noxmldecl" checked>
-        <label for="noxmldecl">Keine XML-Deklaration voranstellen</label>
+        <label for="noxmldecl" data-i18n="label_noxml">Keine XML-Deklaration voranstellen</label>
       </div>
       <div class="actions">
-        <button class="primary" id="downloadBtn">SVG herunterladen</button>
-        <button class="secondary" id="copyBtn">SVG-Code kopieren</button>
+        <button class="primary" id="downloadBtn" data-i18n="btn_download">SVG herunterladen</button>
+        <button class="secondary" id="copyBtn" data-i18n="btn_copy">SVG-Code kopieren</button>
       </div>
       <div class="status" id="status"></div>
     </div>
 
-    <footer>Rendering via MathJax (SVG-Ausgabe) — läuft vollständig im Browser, keine Server-Anfrage nötig. <a
+    <footer data-i18n-html="footer">Rendering via MathJax (SVG-Ausgabe) — läuft vollständig im Browser, keine Server-Anfrage nötig. <a
         href="https://docs.mathjax.org/en/latest/input/tex/macros/index.html" target="_blank"
         rel="noopener noreferrer">MathJax-Referenz</a></footer>
   </div>
@@ -528,11 +564,157 @@
     const ocrFileEl = document.getElementById('ocrFile');
     const ocrThumbEl = document.getElementById('ocrThumb');
     const ocrStatusEl = document.getElementById('ocrStatus');
+    const uiLangEl = document.getElementById('uilang');
 
     let currentSvg = null;
     let currentSpeech = '';
     let renderTimer = null;
     let previewMode = 'light';
+
+    /* ===================== Internationalization (i18n) =====================
+       All user-facing strings live here. Static markup carries data-i18n /
+       data-i18n-title / data-i18n-html attributes; JS-built strings go through
+       t(key, vars). German is the default; the header select switches language.
+       ====================================================================== */
+    const I18N = {
+      de: {
+        page_title: 'Formulator — Formel zu SVG',
+        ui_language: 'Sprache',
+        subtitle: 'LaTeX-Formel eingeben, live als SVG rendern und herunterladen',
+        label_formula: 'LaTeX-Formel',
+        ocr_zone_title: 'Bild einer Formel hier ablegen, einfügen (Strg/Cmd+V) oder klicken zum Auswählen',
+        ocr_text: 'Formel-Bild hierher ziehen, einfügen (Strg/Cmd&nbsp;+&nbsp;V) oder klicken',
+        ocr_sub: 'wird lokal im Browser per Texo-Modell zu LaTeX erkannt',
+        label_placement: 'Platzierung',
+        place_display: 'in separatem Absatz',
+        place_inline: 'im Fließtext',
+        recommended_suffix: ' (empfohlen)',
+        label_basesize: 'Standardschriftgröße (px)',
+        basesize_title: 'Referenz für em/rem – z. B. die Standard-Schriftgröße deiner Zielseite. Bei px/pt ohne Bedeutung.',
+        label_fontsize: 'Schriftgröße der Formel',
+        exportunit_title: 'Einheit der Formel-Schriftgröße – bestimmt zugleich die Einheit von width/height im exportierten SVG.',
+        label_color: 'Textfarbe',
+        label_bgcolor: 'Hintergrundfarbe',
+        label_bgtoggle: 'Hintergrund einfügen',
+        label_darkcolor: 'Farbe (Dark Mode)',
+        label_darkmode: 'Dark-Mode-fähig exportieren',
+        label_speechlang: 'Vorlese-Sprache',
+        speechlang_title: 'Sprache des eingebetteten Vorlesetexts für Screenreader',
+        lang_de: 'Deutsch',
+        lang_en: 'Englisch',
+        label_a11y: 'Vorlesetext für Screenreader einbetten',
+        hint_darkmode: 'Das SVG passt sich per <code>prefers-color-scheme</code> automatisch der Systemeinstellung an. Hintergrund bleibt dafür transparent. Bei Websites mit manuellem Dark-Mode-Schalter (statt Systemvorgabe) muss das SVG inline ins HTML eingebettet werden, nicht per &lt;img&gt;.',
+        hint_relativesize: '<code>width</code>/<code>height</code> werden relativ zur <em>Standardschriftgröße</em> geschrieben, statt in festen Pixeln. Ist das SVG-Markup direkt (inline) in eine Seite eingebettet, deren (Root-)Schriftgröße dieser Standardschriftgröße entspricht, erscheint die Formel genau so groß wie hier in der Vorschau und skaliert mit der Textgröße. Bei Einbindung per <code>&lt;img src="..."&gt;</code> greift das nicht &ndash; dort stattdessen im Stylesheet der Seite z.&nbsp;B. <code>img.formula { height: 1.1em; width: auto; }</code> setzen.',
+        hint_rem: 'Achtung: Firefox unterstützt <code>rem</code> als <code>width</code>/<code>height</code>-Einheit bei SVGs bislang nicht zuverlässig (Chrome, Safari und Edge schon). Für garantierte Kompatibilität <code>em</code> oder <code>px</code> verwenden.',
+        label_preview: 'Vorschau',
+        toggle_light: 'Hell',
+        toggle_dark: 'Dunkel',
+        label_noxml: 'Keine XML-Deklaration voranstellen',
+        btn_download: 'SVG herunterladen',
+        btn_copy: 'SVG-Code kopieren',
+        footer: 'Rendering via MathJax (SVG-Ausgabe) — läuft vollständig im Browser, keine Server-Anfrage nötig. <a href="https://docs.mathjax.org/en/latest/input/tex/macros/index.html" target="_blank" rel="noopener noreferrer">MathJax-Referenz</a>',
+        err_empty: 'Bitte eine Formel eingeben.',
+        err_mathjax_loading: 'MathJax wird noch geladen …',
+        err_no_svg: 'Kein SVG erzeugt.',
+        err_render: 'Fehler beim Rendern: {msg}',
+        dims_readout: 'Schriftgröße: {font} px · Grafik: {w} × {h} px',
+        speech_off: 'Vorlesetext deaktiviert.',
+        speech_text: '🔊 Vorlesetext: „{speech}“',
+        speech_generating: 'Vorlesetext wird erzeugt … (a11y-Komponente lädt evtl. noch — erneut tippen)',
+        status_downloaded: 'SVG heruntergeladen.',
+        status_copied: 'SVG-Code in Zwischenablage kopiert.',
+        status_copy_failed: 'Kopieren fehlgeschlagen — Zwischenablage nicht verfügbar.',
+        ocr_model_loading: 'Modell wird geladen … {file} {pct}%',
+        ocr_model_preparing: 'Modell wird vorbereitet … (erster Aufruf lädt ~80 MB)',
+        ocr_recognizing: 'Formel wird erkannt …',
+        ocr_none: 'Keine Formel erkannt. Anderes/schärferes Bild versuchen.',
+        ocr_recognized: 'Erkannt: {latex}',
+        ocr_failed: 'Erkennung fehlgeschlagen: {msg}',
+        ocr_not_image: 'Das war kein Bild.',
+        ocr_img_load_failed: 'Bild konnte nicht geladen werden.'
+      },
+      en: {
+        page_title: 'Formulator — formula to SVG',
+        ui_language: 'Language',
+        subtitle: 'Enter a LaTeX formula, render it live as SVG and download it',
+        label_formula: 'LaTeX formula',
+        ocr_zone_title: 'Drop an image of a formula here, paste it (Ctrl/Cmd+V) or click to pick a file',
+        ocr_text: 'Drag a formula image here, paste it (Ctrl/Cmd&nbsp;+&nbsp;V) or click',
+        ocr_sub: 'recognized to LaTeX locally in your browser via the Texo model',
+        label_placement: 'Placement',
+        place_display: 'in a separate block',
+        place_inline: 'inline in text',
+        recommended_suffix: ' (recommended)',
+        label_basesize: 'Base font size (px)',
+        basesize_title: 'Reference for em/rem – e.g. the standard font size of your target page. Irrelevant for px/pt.',
+        label_fontsize: 'Formula font size',
+        exportunit_title: 'Unit of the formula font size – also determines the unit of width/height in the exported SVG.',
+        label_color: 'Text color',
+        label_bgcolor: 'Background color',
+        label_bgtoggle: 'Add background',
+        label_darkcolor: 'Color (dark mode)',
+        label_darkmode: 'Export dark-mode aware',
+        label_speechlang: 'Speech language',
+        speechlang_title: 'Language of the embedded spoken text for screen readers',
+        lang_de: 'German',
+        lang_en: 'English',
+        label_a11y: 'Embed spoken text for screen readers',
+        hint_darkmode: 'The SVG adapts to the system setting automatically via <code>prefers-color-scheme</code>; the background stays transparent for that. On sites with a manual dark-mode toggle (rather than the system setting), the SVG must be embedded inline in the HTML, not via &lt;img&gt;.',
+        hint_relativesize: '<code>width</code>/<code>height</code> are written relative to the <em>base font size</em> instead of fixed pixels. When the SVG markup is embedded directly (inline) in a page whose (root) font size equals this base font size, the formula appears exactly as large as in the preview here and scales with the text size. When embedding via <code>&lt;img src="..."&gt;</code> this has no effect &ndash; there, set e.g. <code>img.formula { height: 1.1em; width: auto; }</code> in the page stylesheet instead.',
+        hint_rem: 'Note: Firefox does not reliably support <code>rem</code> as a <code>width</code>/<code>height</code> unit for SVGs yet (Chrome, Safari and Edge do). For guaranteed compatibility use <code>em</code> or <code>px</code>.',
+        label_preview: 'Preview',
+        toggle_light: 'Light',
+        toggle_dark: 'Dark',
+        label_noxml: 'Omit the XML declaration',
+        btn_download: 'Download SVG',
+        btn_copy: 'Copy SVG code',
+        footer: 'Rendering via MathJax (SVG output) — runs entirely in the browser, no server request needed. <a href="https://docs.mathjax.org/en/latest/input/tex/macros/index.html" target="_blank" rel="noopener noreferrer">MathJax reference</a>',
+        err_empty: 'Please enter a formula.',
+        err_mathjax_loading: 'MathJax is still loading …',
+        err_no_svg: 'No SVG produced.',
+        err_render: 'Rendering error: {msg}',
+        dims_readout: 'Font size: {font} px · Graphic: {w} × {h} px',
+        speech_off: 'Spoken text disabled.',
+        speech_text: '🔊 Spoken text: “{speech}”',
+        speech_generating: 'Generating spoken text … (a11y component may still be loading — type again)',
+        status_downloaded: 'SVG downloaded.',
+        status_copied: 'SVG code copied to clipboard.',
+        status_copy_failed: 'Copy failed — clipboard not available.',
+        ocr_model_loading: 'Loading model … {file} {pct}%',
+        ocr_model_preparing: 'Preparing model … (first use downloads ~80 MB)',
+        ocr_recognizing: 'Recognizing formula …',
+        ocr_none: 'No formula recognized. Try a different/sharper image.',
+        ocr_recognized: 'Recognized: {latex}',
+        ocr_failed: 'Recognition failed: {msg}',
+        ocr_not_image: 'That was not an image.',
+        ocr_img_load_failed: 'Image could not be loaded.'
+      }
+    };
+    let lang = 'de';
+
+    function t(key, vars) {
+      let s = (I18N[lang] && I18N[lang][key] != null) ? I18N[lang][key] : (I18N.en[key] != null ? I18N.en[key] : key);
+      if (vars) for (const k in vars) s = s.split('{' + k + '}').join(vars[k]);
+      return s;
+    }
+
+    function applyStaticI18n() {
+      document.documentElement.lang = lang;
+      document.title = t('page_title');
+      document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+      document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
+      document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });
+      // The "(recommended)" suffix on the display-mode option depends on the platform.
+      if (!isWindows()) displayOptionEl.textContent += t('recommended_suffix');
+    }
+
+    // Re-apply everything that language affects: static markup + the live readouts
+    // and any currently-shown status message category.
+    function applyI18n() {
+      applyStaticI18n();
+      updateDimsReadout();
+      updateSpeechReadout();
+    }
 
     function setError(msg) {
       if (msg) {
@@ -603,14 +785,16 @@
       // like an integral with limits span well beyond the font size (see the field's
       // help text).
       const rect = currentSvg.getBoundingClientRect();
-      dimsReadoutEl.textContent =
-        `Schriftgröße: ${Math.round(currentFontPx())} px · ` +
-        `Grafik: ${Math.round(rect.width)} × ${Math.round(rect.height)} px`;
+      dimsReadoutEl.textContent = t('dims_readout', {
+        font: Math.round(currentFontPx()),
+        w: Math.round(rect.width),
+        h: Math.round(rect.height)
+      });
     }
 
     function updateSpeechReadout() {
       if (!a11yToggleEl.checked) {
-        speechReadoutEl.textContent = 'Vorlesetext deaktiviert.';
+        speechReadoutEl.textContent = t('speech_off');
         return;
       }
       if (!currentSvg) {
@@ -618,8 +802,8 @@
         return;
       }
       speechReadoutEl.textContent = currentSpeech
-        ? `🔊 Vorlesetext: „${currentSpeech}“`
-        : 'Vorlesetext wird erzeugt … (a11y-Komponente lädt evtl. noch — erneut tippen)';
+        ? t('speech_text', { speech: currentSpeech })
+        : t('speech_generating');
     }
 
     async function render() {
@@ -633,12 +817,12 @@
 
       if (!input) {
         previewEl.innerHTML = '';
-        setError('Bitte eine Formel eingeben.');
+        setError(t('err_empty'));
         return;
       }
 
       if (typeof MathJax === 'undefined' || !MathJax.tex2svgPromise) {
-        setError('MathJax wird noch geladen …');
+        setError(t('err_mathjax_loading'));
         return;
       }
 
@@ -649,7 +833,7 @@
         // on the mjx-container (not the inner <svg>), so read it before extracting the svg.
         currentSpeech = (node.getAttribute && node.getAttribute('aria-label')) || '';
         const svg = node.querySelector('svg');
-        if (!svg) throw new Error('Kein SVG erzeugt.');
+        if (!svg) throw new Error(t('err_no_svg'));
 
         previewEl.innerHTML = '';
         previewEl.appendChild(svg);
@@ -663,7 +847,7 @@
         copyBtn.disabled = false;
       } catch (err) {
         previewEl.innerHTML = '';
-        setError(`Fehler beim Rendern: ${err && err.message ? err.message : String(err)}`);
+        setError(t('err_render', { msg: err && err.message ? err.message : String(err) }));
       }
     }
 
@@ -827,7 +1011,7 @@
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      setStatus('SVG heruntergeladen.');
+      setStatus(t('status_downloaded'));
     });
 
     copyBtn.addEventListener('click', async () => {
@@ -837,10 +1021,10 @@
       const source = serializeExportSvg(exportSvg);
       try {
         await navigator.clipboard.writeText(source);
-        setStatus('SVG-Code in Zwischenablage kopiert.', true);
+        setStatus(t('status_copied'), true);
       }
       catch (err) {
-        setStatus('Kopieren fehlgeschlagen — Zwischenablage nicht verfügbar.');
+        setStatus(t('status_copy_failed'));
       }
     });
 
@@ -902,9 +1086,14 @@
       return /Win/.test(navigator.userAgent);
     }
 
-    if (!isWindows()) {
-      displayOptionEl.textContent += ' (empfohlen)';
-    }
+    uiLangEl.addEventListener('change', () => {
+      lang = uiLangEl.value;
+      applyI18n();
+    });
+
+    // Apply all translations once for the initial language (also sets the "(recommended)"
+    // suffix and the live readouts).
+    applyI18n();
 
     // Sync dependent UI state with whatever the checkboxes/selects are preset to in
     // the markup (e.g. darkmode checked or "rem" preselected by default), since the
@@ -966,7 +1155,7 @@
           TensorCtor = Tensor;
           const progress_callback = (p) => {
             if (p && p.status === 'progress' && p.file && typeof p.progress === 'number') {
-              setOcrStatus(`Modell wird geladen … ${p.file} ${Math.round(p.progress)}%`);
+              setOcrStatus(t('ocr_model_loading', { file: p.file, pct: Math.round(p.progress) }));
             }
           };
           const [tokenizer, model] = await Promise.all([
@@ -1067,7 +1256,7 @@
       return new Promise((resolve, reject) => {
         const img = new Image();
         img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error('Bild konnte nicht geladen werden.'));
+        img.onerror = () => reject(new Error(t('ocr_img_load_failed')));
         img.src = url;
       });
     }
@@ -1077,24 +1266,24 @@
       ocrBusy = true;
       ocrZoneEl.classList.remove('dragover');
       try {
-        setOcrStatus('Modell wird vorbereitet … (erster Aufruf lädt ~80 MB)');
+        setOcrStatus(t('ocr_model_preparing'));
         const { tokenizer, model } = await getOcrModel();
         const img = await loadImageEl(url);
-        setOcrStatus('Formel wird erkannt …');
+        setOcrStatus(t('ocr_recognizing'));
         const pixelValues = preprocessToTensor(img);
         const generated = await model.generate({ pixel_values: pixelValues, max_new_tokens: 512 });
         const decoded = tokenizer.batch_decode(generated, { skip_special_tokens: true });
         const latex = cleanOcrLatex(Array.isArray(decoded) ? decoded[0] : decoded);
         if (!latex) {
-          setOcrStatus('Keine Formel erkannt. Anderes/schärferes Bild versuchen.', 'error');
+          setOcrStatus(t('ocr_none'), 'error');
           return;
         }
         formulaEl.value = latex;
         render();
-        setOcrStatus(`Erkannt: ${latex}`, 'ok');
+        setOcrStatus(t('ocr_recognized', { latex }), 'ok');
       } catch (err) {
         console.error(err);
-        setOcrStatus('Erkennung fehlgeschlagen: ' + (err && err.message ? err.message : String(err)), 'error');
+        setOcrStatus(t('ocr_failed', { msg: err && err.message ? err.message : String(err) }), 'error');
       } finally {
         ocrBusy = false;
       }
@@ -1103,7 +1292,7 @@
     // Show a small thumbnail of the dropped/pasted image, then recognize it.
     function handleImageBlob(blob) {
       if (!blob || !blob.type || !blob.type.startsWith('image/')) {
-        setOcrStatus('Das war kein Bild.', 'error');
+        setOcrStatus(t('ocr_not_image'), 'error');
         return;
       }
       const url = URL.createObjectURL(blob);
