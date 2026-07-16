@@ -468,13 +468,6 @@
           <input type="checkbox" id="darkmode" aria-checked="true" checked>
           <label for="darkmode" data-i18n="label_darkmode">Dark-Mode-fähig exportieren</label>
         </div>
-        <div class="option">
-          <label for="speechlang" data-i18n="label_speechlang">Vorlese-Sprache</label>
-          <select id="speechlang" data-i18n-title="speechlang_title" title="Sprache des eingebetteten Vorlesetexts für Screenreader">
-            <option value="de" data-i18n="lang_de">Deutsch</option>
-            <option value="en" data-i18n="lang_en">Englisch</option>
-          </select>
-        </div>
         <div class="option inline">
           <input type="checkbox" id="a11ytoggle" checked>
           <label for="a11ytoggle" data-i18n="label_a11y">Vorlesetext für Screenreader einbetten</label>
@@ -555,7 +548,6 @@
     const dimsReadoutEl = document.getElementById('dimsReadout');
     const speechReadoutEl = document.getElementById('speechReadout');
     const a11yToggleEl = document.getElementById('a11ytoggle');
-    const speechLangEl = document.getElementById('speechlang');
     const errorEl = document.getElementById('error');
     const statusEl = document.getElementById('status');
     const downloadBtn = document.getElementById('downloadBtn');
@@ -598,10 +590,6 @@
         label_bgtoggle: 'Hintergrund einfügen',
         label_darkcolor: 'Farbe (Dark Mode)',
         label_darkmode: 'Dark-Mode-fähig exportieren',
-        label_speechlang: 'Vorlese-Sprache',
-        speechlang_title: 'Sprache des eingebetteten Vorlesetexts für Screenreader',
-        lang_de: 'Deutsch',
-        lang_en: 'Englisch',
         label_a11y: 'Vorlesetext für Screenreader einbetten',
         hint_darkmode: 'Das SVG passt sich per <code>prefers-color-scheme</code> automatisch der Systemeinstellung an. Hintergrund bleibt dafür transparent. Bei Websites mit manuellem Dark-Mode-Schalter (statt Systemvorgabe) muss das SVG inline ins HTML eingebettet werden, nicht per &lt;img&gt;.',
         hint_relativesize: '<code>width</code>/<code>height</code> werden relativ zur <em>Standardschriftgröße</em> geschrieben, statt in festen Pixeln. Ist das SVG-Markup direkt (inline) in eine Seite eingebettet, deren (Root-)Schriftgröße dieser Standardschriftgröße entspricht, erscheint die Formel genau so groß wie hier in der Vorschau und skaliert mit der Textgröße. Bei Einbindung per <code>&lt;img src="..."&gt;</code> greift das nicht &ndash; dort stattdessen im Stylesheet der Seite z.&nbsp;B. <code>img.formula { height: 1.1em; width: auto; }</code> setzen.',
@@ -654,10 +642,6 @@
         label_bgtoggle: 'Add background',
         label_darkcolor: 'Color (dark mode)',
         label_darkmode: 'Export dark-mode aware',
-        label_speechlang: 'Speech language',
-        speechlang_title: 'Language of the embedded spoken text for screen readers',
-        lang_de: 'German',
-        lang_en: 'English',
         label_a11y: 'Embed spoken text for screen readers',
         hint_darkmode: 'The SVG adapts to the system setting automatically via <code>prefers-color-scheme</code>; the background stays transparent for that. On sites with a manual dark-mode toggle (rather than the system setting), the SVG must be embedded inline in the HTML, not via &lt;img&gt;.',
         hint_relativesize: '<code>width</code>/<code>height</code> are written relative to the <em>base font size</em> instead of fixed pixels. When the SVG markup is embedded directly (inline) in a page whose (root) font size equals this base font size, the formula appears exactly as large as in the preview here and scales with the text size. When embedding via <code>&lt;img src="..."&gt;</code> this has no effect &ndash; there, set e.g. <code>img.formula { height: 1.1em; width: auto; }</code> in the page stylesheet instead.',
@@ -1059,18 +1043,22 @@
       setStatus('');
     });
 
-    speechLangEl.addEventListener('change', () => {
-      // Point the Speech Rule Engine at the chosen locale and re-render so the new
-      // spoken text is generated. The locale data is fetched from the MathJax CDN on
-      // demand, so the very first switch to a language may take a moment.
+    // The screen-reader speech follows the UI language. Map it to a locale supported by
+    // MathJax's Speech Rule Engine (both current UI languages have one; fall back to en).
+    function speechLocaleFor(uiLang) {
+      const supported = { de: 'de', en: 'en' };
+      return supported[uiLang] || 'en';
+    }
+
+    // Point the Speech Rule Engine at the given locale. Data is fetched from the MathJax
+    // CDN on demand, so the very first switch to a language may take a moment.
+    function applySpeechLocale() {
       try {
         if (window.MathJax && MathJax.startup && MathJax.startup.document) {
-          MathJax.startup.document.options.sre.locale = speechLangEl.value;
+          MathJax.startup.document.options.sre.locale = speechLocaleFor(lang);
         }
-      } catch (e) { /* MathJax not ready yet; the value is read again on next render */ }
-      setStatus('');
-      render();
-    });
+      } catch (e) { /* MathJax not ready yet; locale is re-applied on the next language change */ }
+    }
 
     previewToggleEl.addEventListener('click', (e) => {
       const btn = e.target.closest('button[data-mode]');
@@ -1089,6 +1077,9 @@
     uiLangEl.addEventListener('change', () => {
       lang = uiLangEl.value;
       applyI18n();
+      // Regenerate the spoken description in the new language so it matches the UI.
+      applySpeechLocale();
+      render();
     });
 
     // Apply all translations once for the initial language (also sets the "(recommended)"
@@ -1108,7 +1099,10 @@
     // point (this inline script runs during parsing, before deferred scripts). Wait for
     // its 'load' event rather than assuming `MathJax.startup` already exists.
     document.getElementById('mathjax-script').addEventListener('load', () => {
-      MathJax.startup.promise.then(render);
+      MathJax.startup.promise.then(() => {
+        applySpeechLocale(); // match the initial UI language
+        render();
+      });
     });
 
     /* ===================================================================
