@@ -646,6 +646,12 @@
         }
       }
 
+      // MathJax marks the SVG aria-hidden="true" by default, assuming a parallel hidden
+      // MathML tree (the assistive-mml package, not loaded here) carries the accessible
+      // content instead. Remove it so the <title> below actually reaches assistive tech
+      // rather than being suppressed along with the rest of the (now hidden) subtree.
+      clone.removeAttribute('aria-hidden');
+
       const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
       title.textContent = formulaEl.value.trim();
       clone.insertBefore(title, clone.firstChild);
