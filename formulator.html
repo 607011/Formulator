@@ -8,12 +8,25 @@
   <link rel="icon" type="image/svg+xml" href="assets/math-formula.svg">
   <script>
     MathJax = {
+      loader: {
+        load: ['a11y/semantic-enrich']
+      },
       tex: {
         packages: { '[+]': ['ams', 'boldsymbol'] }
       },
       svg: {
         fontCache: 'local',
         scale: 1
+      },
+      options: {
+        // Enable MathJax's Speech Rule Engine so every rendered formula gets a spoken
+        // description (as an aria-label on the container), which we bake into the
+        // exported SVG for screen readers. Locale is switched at runtime.
+        enableEnrichment: true,
+        sre: {
+          speech: 'shallow',
+          locale: 'de'
+        }
       },
       startup: {
         typeset: false
@@ -352,6 +365,17 @@
           <input type="checkbox" id="darkmode" aria-checked="true" checked>
           <label for="darkmode">Dark-Mode-fähig exportieren</label>
         </div>
+        <div class="option">
+          <label for="speechlang">Vorlese-Sprache</label>
+          <select id="speechlang" title="Sprache des eingebetteten Vorlesetexts für Screenreader">
+            <option value="de" selected>Deutsch</option>
+            <option value="en">Englisch</option>
+          </select>
+        </div>
+        <div class="option inline">
+          <input type="checkbox" id="a11ytoggle" checked>
+          <label for="a11ytoggle">Vorlesetext für Screenreader einbetten</label>
+        </div>
       </div>
 
       <p class="hint" id="darkmodeHint" hidden>
@@ -389,6 +413,7 @@
         <div id="preview"></div>
       </div>
       <p class="hint" id="dimsReadout" style="margin-top: 8px;"></p>
+      <p class="hint" id="speechReadout" style="margin-top: 4px;"></p>
       <div class="option inline" style="margin-top: 14px;">
         <input type="checkbox" id="noxmldecl" checked>
         <label for="noxmldecl">Keine XML-Deklaration voranstellen</label>
@@ -425,12 +450,16 @@
     const previewEl = document.getElementById('preview');
     const previewWrapEl = document.getElementById('previewWrap');
     const dimsReadoutEl = document.getElementById('dimsReadout');
+    const speechReadoutEl = document.getElementById('speechReadout');
+    const a11yToggleEl = document.getElementById('a11ytoggle');
+    const speechLangEl = document.getElementById('speechlang');
     const errorEl = document.getElementById('error');
     const statusEl = document.getElementById('status');
     const downloadBtn = document.getElementById('downloadBtn');
     const copyBtn = document.getElementById('copyBtn');
 
     let currentSvg = null;
+    let currentSpeech = '';
     let renderTimer = null;
     let previewMode = 'light';
 
@@ -508,12 +537,28 @@
         `Grafik: ${Math.round(rect.width)} × ${Math.round(rect.height)} px`;
     }
 
+    function updateSpeechReadout() {
+      if (!a11yToggleEl.checked) {
+        speechReadoutEl.textContent = 'Vorlesetext deaktiviert.';
+        return;
+      }
+      if (!currentSvg) {
+        speechReadoutEl.textContent = '';
+        return;
+      }
+      speechReadoutEl.textContent = currentSpeech
+        ? `🔊 Vorlesetext: „${currentSpeech}“`
+        : 'Vorlesetext wird erzeugt … (a11y-Komponente lädt evtl. noch — erneut tippen)';
+    }
+
     async function render() {
       const input = formulaEl.value.trim();
       downloadBtn.disabled = true;
       copyBtn.disabled = true;
       currentSvg = null;
+      currentSpeech = '';
       updateDimsReadout();
+      updateSpeechReadout();
 
       if (!input) {
         previewEl.innerHTML = '';
@@ -529,6 +574,9 @@
       try {
         const display = modeEl.value === 'display';
         const node = await MathJax.tex2svgPromise(input, { display });
+        // MathJax's Speech Rule Engine attaches the spoken description as an aria-label
+        // on the mjx-container (not the inner <svg>), so read it before extracting the svg.
+        currentSpeech = (node.getAttribute && node.getAttribute('aria-label')) || '';
         const svg = node.querySelector('svg');
         if (!svg) throw new Error('Kein SVG erzeugt.');
 
@@ -536,6 +584,7 @@
         previewEl.appendChild(svg);
         currentSvg = svg;
         updatePreviewChrome();
+        updateSpeechReadout();
 
         setError(null);
         setStatus('');
@@ -654,15 +703,33 @@
         }
       }
 
-      // MathJax marks the SVG aria-hidden="true" by default, assuming a parallel hidden
-      // MathML tree (the assistive-mml package, not loaded here) carries the accessible
-      // content instead. Remove it so the <title> below actually reaches assistive tech
-      // rather than being suppressed along with the rest of the (now hidden) subtree.
+      // Accessibility: bake in the spoken description so screen readers read the formula
+      // aloud instead of skipping the graphic (or spelling out raw LaTeX). MathJax may
+      // mark the SVG aria-hidden="true" (assuming a parallel hidden MathML tree that we
+      // don't ship); remove that so the accessible name below actually reaches assistive
+      // tech. role="img" + <title> provides the accessible name for inline SVG, and
+      // aria-label reinforces it across screen readers. The LaTeX source is kept in
+      // <desc> as a secondary, machine-readable description.
       clone.removeAttribute('aria-hidden');
+      const svgNS = 'http://www.w3.org/2000/svg';
+      const latex = formulaEl.value.trim();
+      const speech = (a11yToggleEl.checked && currentSpeech) ? currentSpeech : '';
 
-      const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-      title.textContent = formulaEl.value.trim();
-      clone.insertBefore(title, clone.firstChild);
+      clone.setAttribute('role', 'img');
+      if (speech) {
+        clone.setAttribute('aria-label', speech);
+      } else {
+        clone.removeAttribute('aria-label');
+      }
+
+      // Insert as first children in the order <title>, <desc> (title must come first).
+      const descEl = document.createElementNS(svgNS, 'desc');
+      descEl.textContent = `LaTeX: ${latex}`;
+      clone.insertBefore(descEl, clone.firstChild);
+
+      const titleEl = document.createElementNS(svgNS, 'title');
+      titleEl.textContent = speech || latex;
+      clone.insertBefore(titleEl, clone.firstChild);
 
       return clone;
     }
@@ -732,6 +799,24 @@
 
     noXmlDeclEl.addEventListener('change', () => setStatus(''));
 
+    a11yToggleEl.addEventListener('change', () => {
+      updateSpeechReadout();
+      setStatus('');
+    });
+
+    speechLangEl.addEventListener('change', () => {
+      // Point the Speech Rule Engine at the chosen locale and re-render so the new
+      // spoken text is generated. The locale data is fetched from the MathJax CDN on
+      // demand, so the very first switch to a language may take a moment.
+      try {
+        if (window.MathJax && MathJax.startup && MathJax.startup.document) {
+          MathJax.startup.document.options.sre.locale = speechLangEl.value;
+        }
+      } catch (e) { /* MathJax not ready yet; the value is read again on next render */ }
+      setStatus('');
+      render();
+    });
+
     previewToggleEl.addEventListener('click', (e) => {
       const btn = e.target.closest('button[data-mode]');
       if (!btn)
@@ -755,6 +840,7 @@
     // above listeners only fire on user-triggered "change" events, not on load.
     updateDarkModeUI();
     updateBaseState();
+    updateSpeechReadout();
     relativesizeHintEl.hidden = !(exportUnitEl.value === 'em' || exportUnitEl.value === 'rem');
     remHintEl.hidden = exportUnitEl.value !== 'rem';
 
