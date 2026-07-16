@@ -315,9 +315,10 @@
         <div class="option">
           <label for="fontsize">Schriftgröße</label>
           <div class="size-row">
-            <input type="number" id="fontsize" value="48" min="8" max="400" step="1">
+            <input type="number" id="fontsize" value="2" min="0.1" max="48" step="0.1">
             <select id="exportunit" title="Einheit für width/height beim SVG-Export">
-              <option value="px" selected>px</option>
+              <option value="rem" selected>rem</option>
+              <option value="px">px</option>
               <option value="em">em</option>
               <option value="pt">pt</option>
             </select>
@@ -350,7 +351,11 @@
       </p>
 
       <p class="hint" id="relativesizeHint" hidden>
-        <code>width</code>/<code>height</code> werden relativ zur oben eingestellten Schriftgröße in <code>em</code> statt in festen Pixeln geschrieben. Dadurch skaliert die Formel automatisch mit der Schriftgröße, wenn das SVG-Markup direkt (inline) ins HTML eingebettet wird. Bei Einbindung per <code>&lt;img src="..."&gt;</code> greift das nicht &ndash; dort stattdessen im Stylesheet der Seite z.&nbsp;B. <code>img.formula { height: 1.1em; width: auto; }</code> setzen.
+        <code>width</code>/<code>height</code> werden relativ zur oben eingestellten Schriftgröße geschrieben, statt in festen Pixeln. Dadurch skaliert die Formel automatisch mit der Schriftgröße, wenn das SVG-Markup direkt (inline) ins HTML eingebettet wird. Bei Einbindung per <code>&lt;img src="..."&gt;</code> greift das nicht &ndash; dort stattdessen im Stylesheet der Seite z.&nbsp;B. <code>img.formula { height: 1.1em; width: auto; }</code> setzen.
+      </p>
+
+      <p class="hint" id="remHint" hidden>
+        Achtung: Firefox unterstützt <code>rem</code> als <code>width</code>/<code>height</code>-Einheit bei SVGs bislang nicht zuverlässig (Chrome, Safari und Edge schon). Für garantierte Kompatibilität <code>em</code> oder <code>px</code> verwenden.
       </p>
 
       <div class="error" id="error"></div>
@@ -366,6 +371,10 @@
       </div>
       <div class="preview-wrap" id="previewWrap">
         <div id="preview"></div>
+      </div>
+      <div class="option inline" style="margin-top: 14px;">
+        <input type="checkbox" id="noxmldecl" checked>
+        <label for="noxmldecl" style="margin:0;">Keine XML-Deklaration voranstellen</label>
       </div>
       <div class="actions">
         <button class="primary" id="downloadBtn">SVG herunterladen</button>
@@ -389,6 +398,8 @@
     const darkmodeHintEl = document.getElementById('darkmodeHint');
     const exportUnitEl = document.getElementById('exportunit');
     const relativesizeHintEl = document.getElementById('relativesizeHint');
+    const remHintEl = document.getElementById('remHint');
+    const noXmlDeclEl = document.getElementById('noxmldecl');
     const previewToggleEl = document.getElementById('previewToggle');
     const previewEl = document.getElementById('preview');
     const previewWrapEl = document.getElementById('previewWrap');
@@ -498,15 +509,18 @@
       const clone = currentSvg.cloneNode(true);
       const rect = currentSvg.getBoundingClientRect();
 
-      if (exportUnitEl.value === 'em') {
-        // Express width/height relative to the configured preview font size (in em)
-        // instead of fixed pixels, so the formula scales with the surrounding text's
-        // font size when the SVG markup is embedded inline in HTML. (Has no effect
-        // when referenced via <img src="...">, since that isolates the SVG's CSS
-        // context — use CSS on the <img> element itself for that case instead.)
+      if (exportUnitEl.value === 'em' || exportUnitEl.value === 'rem') {
+        // Express width/height relative to the configured preview font size (in em
+        // or rem) instead of fixed pixels, so the formula scales with the surrounding
+        // text's font size when the SVG markup is embedded inline in HTML. (Has no
+        // effect when referenced via <img src="...">, since that isolates the SVG's
+        // CSS context — use CSS on the <img> element itself for that case instead.
+        // Also note: Firefox doesn't reliably support "rem" as an SVG width/height
+        // attribute unit, unlike Chrome/Safari/Edge — see remHint in the UI.)
         const basePx = parseFloat(fontsizeEl.value) || 16;
-        clone.setAttribute('width', trimNum(rect.width / basePx) + 'em');
-        clone.setAttribute('height', trimNum(rect.height / basePx) + 'em');
+        const unit = exportUnitEl.value;
+        clone.setAttribute('width', trimNum(rect.width / basePx) + unit);
+        clone.setAttribute('height', trimNum(rect.height / basePx) + unit);
       } else if (exportUnitEl.value === 'pt') {
         // Absolute unit like px, just in points (1px = 0.75pt at the standard 96dpi
         // CSS reference). Mainly useful for importing into print/design tools (e.g.
@@ -562,7 +576,8 @@
 
     function serializeExportSvg(svgEl) {
       const serializer = new XMLSerializer();
-      let source = serializer.serializeToString(svgEl);
+      const source = serializer.serializeToString(svgEl);
+      if (noXmlDeclEl.checked) return source;
       return '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n' + source;
     }
 
@@ -606,9 +621,13 @@
     });
 
     exportUnitEl.addEventListener('change', () => {
-      relativesizeHintEl.hidden = exportUnitEl.value !== 'em';
+      const unit = exportUnitEl.value;
+      relativesizeHintEl.hidden = !(unit === 'em' || unit === 'rem');
+      remHintEl.hidden = unit !== 'rem';
       setStatus('');
     });
+
+    noXmlDeclEl.addEventListener('change', () => setStatus(''));
 
     previewToggleEl.addEventListener('click', (e) => {
       const btn = e.target.closest('button[data-mode]');
@@ -617,6 +636,13 @@
       setPreviewModeButtons();
       updatePreviewChrome();
     });
+
+    // Sync dependent UI state with whatever the checkboxes/selects are preset to in
+    // the markup (e.g. darkmode checked or "rem" preselected by default), since the
+    // above listeners only fire on user-triggered "change" events, not on load.
+    updateDarkModeUI();
+    relativesizeHintEl.hidden = !(exportUnitEl.value === 'em' || exportUnitEl.value === 'rem');
+    remHintEl.hidden = exportUnitEl.value !== 'rem';
 
     MathJax.startup.promise.then(render);
   </script>
