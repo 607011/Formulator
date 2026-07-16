@@ -1238,11 +1238,52 @@
       return new TensorCtor('float32', chw, [1, 3, OCR_SIZE, OCR_SIZE]);
     }
 
-    // Light cleanup of the model's raw output into KaTeX/MathJax-friendly LaTeX.
+    // The Texo/FormulaNet model was trained on KaTeX's vocabulary and emits KaTeX-only
+    // aliases that MathJax (our renderer) doesn't define — e.g. \infin, \rarr, \R, \sub,
+    // \lparen, or the Eastern-European trig names \tg/\ch. Map those to their standard
+    // MathJax/LaTeX equivalents so the recognized code renders (and stays portable).
+    const KATEX_TO_MATHJAX = {
+      infin: '\\infty',
+      rarr: '\\rightarrow', larr: '\\leftarrow', harr: '\\leftrightarrow',
+      Rarr: '\\Rightarrow', Larr: '\\Leftarrow', Harr: '\\Leftrightarrow',
+      lArr: '\\Leftarrow', rArr: '\\Rightarrow', hArr: '\\Leftrightarrow',
+      lrarr: '\\leftrightarrow', Lrarr: '\\Leftrightarrow', lrArr: '\\Leftrightarrow',
+      uarr: '\\uparrow', darr: '\\downarrow', uArr: '\\Uparrow', dArr: '\\Downarrow',
+      Uarr: '\\Uparrow', Darr: '\\Downarrow',
+      sub: '\\subset', sube: '\\subseteq', supe: '\\supseteq',
+      sdot: '\\cdot', isin: '\\in', plusmn: '\\pm',
+      lparen: '(', rparen: ')', lang: '\\langle', rang: '\\rangle',
+      lt: '<', gt: '>',
+      exist: '\\exists', empty: '\\emptyset',
+      N: '\\mathbb{N}', Z: '\\mathbb{Z}', R: '\\mathbb{R}',
+      Reals: '\\mathbb{R}', reals: '\\mathbb{R}', natnums: '\\mathbb{N}',
+      Complex: '\\mathbb{C}', cnums: '\\mathbb{C}',
+      real: '\\Re', image: '\\Im', weierp: '\\wp',
+      alef: '\\aleph', alefsym: '\\aleph',
+      sect: '\\S', clubs: '\\clubsuit', hearts: '\\heartsuit',
+      diamonds: '\\diamondsuit', spades: '\\spadesuit',
+      Bbb: '\\mathbb', bold: '\\mathbf', frak: '\\mathfrak', bm: '\\boldsymbol',
+      Overrightarrow: '\\overrightarrow', thetasym: '\\vartheta',
+      degree: '^\\circ', minuso: '\\ominus',
+      sh: '\\operatorname{sh}', ch: '\\operatorname{ch}', th: '\\operatorname{th}',
+      tg: '\\operatorname{tg}', ctg: '\\operatorname{ctg}', cth: '\\operatorname{cth}',
+      arctg: '\\operatorname{arctg}', arcctg: '\\operatorname{arcctg}', cosec: '\\operatorname{cosec}',
+      argmax: '\\operatorname*{arg\\,max}', argmin: '\\operatorname*{arg\\,min}', plim: '\\operatorname*{plim}'
+    };
+
+    // Replace whole control words (\name) via the map. Matching the maximal [a-zA-Z]+
+    // run is exactly TeX control-word semantics, so \R maps but \Reals stays \Reals.
+    function katexToMathjax(s) {
+      return s.replace(/\\([a-zA-Z]+)/g, (m, name) =>
+        Object.prototype.hasOwnProperty.call(KATEX_TO_MATHJAX, name) ? KATEX_TO_MATHJAX[name] : m);
+    }
+
+    // Cleanup of the model's raw output into MathJax-ready LaTeX.
     function cleanOcrLatex(raw) {
       let s = (raw || '').trim();
       // The model is trained on spaced tokens ("x ^ { 2 }"); collapse runs of spaces.
       s = s.replace(/\s+/g, ' ').trim();
+      s = katexToMathjax(s);
       return s;
     }
 
