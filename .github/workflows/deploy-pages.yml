@@ -26,6 +26,7 @@ jobs:
         run: |
           mkdir -p _site
           cp formulator.html _site/index.html
+          cp -r assets _site/assets
 
       - name: Setup Pages
         uses: actions/configure-pages@v6
