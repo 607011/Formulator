@@ -310,7 +310,7 @@
         <div class="option">
           <label for="mode">Platzierung</label>
           <select id="mode">
-            <option value="display" selected>in separatem Absatz (empfohlen)</option>
+            <option value="display" id="displayOption" selected>in separatem Absatz</option>
             <option value="inline">im Fließtext</option>
           </select>
         </div>
@@ -408,6 +408,7 @@
   <script>
     const formulaEl = document.getElementById('formula');
     const modeEl = document.getElementById('mode');
+    const displayOptionEl = document.getElementById('displayOption');
     const fontsizeEl = document.getElementById('fontsize');
     const basesizeEl = document.getElementById('basesize');
     const colorEl = document.getElementById('color');
@@ -739,6 +740,15 @@
       setPreviewModeButtons();
       updatePreviewColors();
     });
+
+    function isWindows() {
+      if (navigator.userAgentData) return navigator.userAgentData.platform === 'Windows';
+      return /Win/.test(navigator.userAgent);
+    }
+
+    if (!isWindows()) {
+      displayOptionEl.textContent += ' (empfohlen)';
+    }
 
     // Sync dependent UI state with whatever the checkboxes/selects are preset to in
     // the markup (e.g. darkmode checked or "rem" preselected by default), since the
