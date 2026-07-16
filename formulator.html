@@ -5,6 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Formulator — Formel zu SVG</title>
+  <link rel="icon" type="image/svg+xml" href="assets/math-formula.svg">
   <script>
     MathJax = {
       tex: {
@@ -19,7 +20,8 @@
       }
     };
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" id="mathjax-script"></script>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" id="mathjax-script" defer></script>
   <style>
     :root {
       --bg: #f7f7f8;
@@ -314,13 +316,15 @@
         </div>
         <div class="option">
           <label for="basesize">Standardschriftgröße (px)</label>
-          <input type="number" id="basesize" value="18" min="1" max="100" step="1" title="Referenz für em/rem – z. B. die Standard-Schriftgröße deiner Zielseite. Bei px/pt ohne Bedeutung.">
+          <input type="number" id="basesize" value="18" min="1" max="100" step="1"
+            title="Referenz für em/rem – z. B. die Standard-Schriftgröße deiner Zielseite. Bei px/pt ohne Bedeutung.">
         </div>
         <div class="option">
           <label for="fontsize">Schriftgröße der Formel</label>
           <div class="size-row">
             <input type="number" id="fontsize" value="1" min="0.1" max="500" step="0.1">
-            <select id="exportunit" title="Einheit der Formel-Schriftgröße – bestimmt zugleich die Einheit von width/height im exportierten SVG.">
+            <select id="exportunit"
+              title="Einheit der Formel-Schriftgröße – bestimmt zugleich die Einheit von width/height im exportierten SVG.">
               <option value="em" selected>em</option>
               <option value="rem">rem</option>
               <option value="px">px</option>
@@ -338,7 +342,7 @@
         </div>
         <div class="option inline">
           <input type="checkbox" id="bgtoggle">
-          <label for="bgtoggle" style="margin:0;">Hintergrund einfügen</label>
+          <label for="bgtoggle">Hintergrund einfügen</label>
         </div>
         <div class="option">
           <label for="darkcolor">Farbe (Dark Mode)</label>
@@ -346,20 +350,28 @@
         </div>
         <div class="option inline">
           <input type="checkbox" id="darkmode" aria-checked="true" checked>
-          <label for="darkmode" style="margin:0;">Dark-Mode-fähig exportieren</label>
+          <label for="darkmode">Dark-Mode-fähig exportieren</label>
         </div>
       </div>
 
       <p class="hint" id="darkmodeHint" hidden>
-        Das SVG passt sich per <code>prefers-color-scheme</code> automatisch der Systemeinstellung an. Hintergrund bleibt dafür transparent. Bei Websites mit manuellem Dark-Mode-Schalter (statt Systemvorgabe) muss das SVG inline ins HTML eingebettet werden, nicht per &lt;img&gt;.
+        Das SVG passt sich per <code>prefers-color-scheme</code> automatisch der Systemeinstellung an. Hintergrund
+        bleibt dafür transparent. Bei Websites mit manuellem Dark-Mode-Schalter (statt Systemvorgabe) muss das SVG
+        inline ins HTML eingebettet werden, nicht per &lt;img&gt;.
       </p>
 
       <p class="hint" id="relativesizeHint" hidden>
-        <code>width</code>/<code>height</code> werden relativ zur <em>Standardschriftgröße</em> geschrieben, statt in festen Pixeln. Ist das SVG-Markup direkt (inline) in eine Seite eingebettet, deren (Root-)Schriftgröße dieser Standardschriftgröße entspricht, erscheint die Formel genau so groß wie hier in der Vorschau und skaliert mit der Textgröße. Bei Einbindung per <code>&lt;img src="..."&gt;</code> greift das nicht &ndash; dort stattdessen im Stylesheet der Seite z.&nbsp;B. <code>img.formula { height: 1.1em; width: auto; }</code> setzen.
+        <code>width</code>/<code>height</code> werden relativ zur <em>Standardschriftgröße</em> geschrieben, statt in
+        festen Pixeln. Ist das SVG-Markup direkt (inline) in eine Seite eingebettet, deren (Root-)Schriftgröße dieser
+        Standardschriftgröße entspricht, erscheint die Formel genau so groß wie hier in der Vorschau und skaliert mit
+        der Textgröße. Bei Einbindung per <code>&lt;img src="..."&gt;</code> greift das nicht &ndash; dort stattdessen
+        im Stylesheet der Seite z.&nbsp;B. <code>img.formula { height: 1.1em; width: auto; }</code> setzen.
       </p>
 
       <p class="hint" id="remHint" hidden>
-        Achtung: Firefox unterstützt <code>rem</code> als <code>width</code>/<code>height</code>-Einheit bei SVGs bislang nicht zuverlässig (Chrome, Safari und Edge schon). Für garantierte Kompatibilität <code>em</code> oder <code>px</code> verwenden.
+        Achtung: Firefox unterstützt <code>rem</code> als <code>width</code>/<code>height</code>-Einheit bei SVGs
+        bislang nicht zuverlässig (Chrome, Safari und Edge schon). Für garantierte Kompatibilität <code>em</code> oder
+        <code>px</code> verwenden.
       </p>
 
       <div class="error" id="error"></div>
@@ -367,7 +379,7 @@
 
     <div class="panel">
       <div class="panel-header">
-        <label style="margin:0;">Vorschau</label>
+        <label>Vorschau</label>
         <div class="toggle-group" id="previewToggle" hidden>
           <button type="button" class="active" data-mode="light">Hell</button>
           <button type="button" data-mode="dark">Dunkel</button>
@@ -379,7 +391,7 @@
       <p class="hint" id="dimsReadout" style="margin-top: 8px;"></p>
       <div class="option inline" style="margin-top: 14px;">
         <input type="checkbox" id="noxmldecl" checked>
-        <label for="noxmldecl" style="margin:0;">Keine XML-Deklaration voranstellen</label>
+        <label for="noxmldecl">Keine XML-Deklaration voranstellen</label>
       </div>
       <div class="actions">
         <button class="primary" id="downloadBtn">SVG herunterladen</button>
@@ -388,7 +400,9 @@
       <div class="status" id="status"></div>
     </div>
 
-    <footer>Rendering via MathJax (SVG-Ausgabe) — läuft vollständig im Browser, keine Server-Anfrage nötig. <a href="https://docs.mathjax.org/en/latest/input/tex/macros/index.html" target="_blank" rel="noopener noreferrer">MathJax-Referenz</a></footer>
+    <footer>Rendering via MathJax (SVG-Ausgabe) — läuft vollständig im Browser, keine Server-Anfrage nötig. <a
+        href="https://docs.mathjax.org/en/latest/input/tex/macros/index.html" target="_blank"
+        rel="noopener noreferrer">MathJax-Referenz</a></footer>
   </div>
 
   <script>
@@ -423,7 +437,8 @@
       if (msg) {
         errorEl.textContent = msg;
         errorEl.style.display = 'block';
-      } else {
+      }
+      else {
         errorEl.style.display = 'none';
         errorEl.textContent = '';
       }
@@ -448,21 +463,33 @@
       bgtoggleEl.disabled = active;
       if (active) {
         bgtoggleEl.checked = false;
-      } else {
+      }
+      else {
         previewMode = 'light';
         setPreviewModeButtons();
       }
-      updatePreviewChrome();
+      updatePreviewColors();
     }
 
-    function updatePreviewChrome() {
+    // Font size drives the rendered SVG's pixel dimensions (its width/height are in
+    // font-relative units), so this needs a dims-readout refresh. Split out from
+    // updatePreviewColors() so color-only changes don't force a layout read.
+    function updatePreviewGeometry() {
+      previewEl.style.fontSize = currentFontPx() + 'px';
+      updateDimsReadout();
+    }
+
+    function updatePreviewColors() {
       const darkPreview = darkmodeEl.checked && previewMode === 'dark';
       previewWrapEl.classList.toggle('opaque-bg', bgtoggleEl.checked && !darkmodeEl.checked);
       previewWrapEl.classList.toggle('dark-test', darkPreview);
       previewWrapEl.style.setProperty('--preview-bg', bgcolorEl.value);
-      previewEl.style.fontSize = currentFontPx() + 'px';
       previewEl.style.color = darkPreview ? darkcolorEl.value : colorEl.value;
-      updateDimsReadout();
+    }
+
+    function updatePreviewChrome() {
+      updatePreviewGeometry();
+      updatePreviewColors();
     }
 
     function updateDimsReadout() {
@@ -629,7 +656,8 @@
     function serializeExportSvg(svgEl) {
       const serializer = new XMLSerializer();
       const source = serializer.serializeToString(svgEl);
-      if (noXmlDeclEl.checked) return source;
+      if (noXmlDeclEl.checked)
+        return source;
       return '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n' + source;
     }
 
@@ -656,14 +684,19 @@
       try {
         await navigator.clipboard.writeText(source);
         setStatus('SVG-Code in Zwischenablage kopiert.', true);
-      } catch (err) {
+      }
+      catch (err) {
         setStatus('Kopieren fehlgeschlagen — Zwischenablage nicht verfügbar.');
       }
     });
 
     [formulaEl, modeEl].forEach(el => el.addEventListener('input', scheduleRender));
-    [fontsizeEl, basesizeEl, colorEl, bgcolorEl, bgtoggleEl, darkcolorEl].forEach(el => el.addEventListener('input', () => {
-      updatePreviewChrome();
+    [fontsizeEl, basesizeEl].forEach(el => el.addEventListener('input', () => {
+      updatePreviewGeometry();
+      setStatus('');
+    }));
+    [colorEl, bgcolorEl, bgtoggleEl, darkcolorEl].forEach(el => el.addEventListener('input', () => {
+      updatePreviewColors();
       setStatus('');
     }));
 
@@ -677,7 +710,7 @@
       relativesizeHintEl.hidden = !(unit === 'em' || unit === 'rem');
       remHintEl.hidden = unit !== 'rem';
       updateBaseState();
-      updatePreviewChrome(); // resolved font px depends on the unit
+      updatePreviewGeometry(); // resolved font px depends on the unit
       setStatus('');
     });
 
@@ -685,10 +718,11 @@
 
     previewToggleEl.addEventListener('click', (e) => {
       const btn = e.target.closest('button[data-mode]');
-      if (!btn) return;
+      if (!btn)
+        return;
       previewMode = btn.dataset.mode;
       setPreviewModeButtons();
-      updatePreviewChrome();
+      updatePreviewColors();
     });
 
     // Sync dependent UI state with whatever the checkboxes/selects are preset to in
@@ -699,7 +733,12 @@
     relativesizeHintEl.hidden = !(exportUnitEl.value === 'em' || exportUnitEl.value === 'rem');
     remHintEl.hidden = exportUnitEl.value !== 'rem';
 
-    MathJax.startup.promise.then(render);
+    // MathJax's script tag loads with `defer`, so it may not have executed yet at this
+    // point (this inline script runs during parsing, before deferred scripts). Wait for
+    // its 'load' event rather than assuming `MathJax.startup` already exists.
+    document.getElementById('mathjax-script').addEventListener('load', () => {
+      MathJax.startup.promise.then(render);
+    });
   </script>
 </body>
 
