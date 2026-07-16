@@ -313,20 +313,24 @@
           </select>
         </div>
         <div class="option">
-          <label for="fontsize">Größe</label>
+          <label for="basesize">Standardschriftgröße (px)</label>
+          <input type="number" id="basesize" value="18" min="1" max="100" step="1" title="Referenz für em/rem – z. B. die Standard-Schriftgröße deiner Zielseite. Bei px/pt ohne Bedeutung.">
+        </div>
+        <div class="option">
+          <label for="fontsize">Schriftgröße der Formel</label>
           <div class="size-row">
-            <input type="number" id="fontsize" value="2" min="0.1" max="48" step="0.1">
-            <select id="exportunit" title="Einheit für width/height beim SVG-Export">
-              <option value="rem" selected>rem</option>
+            <input type="number" id="fontsize" value="1" min="0.1" max="500" step="0.1">
+            <select id="exportunit" title="Einheit der Formel-Schriftgröße – bestimmt zugleich die Einheit von width/height im exportierten SVG.">
+              <option value="em" selected>em</option>
+              <option value="rem">rem</option>
               <option value="px">px</option>
-              <option value="em">em</option>
               <option value="pt">pt</option>
             </select>
           </div>
         </div>
         <div class="option">
           <label for="color">Textfarbe</label>
-          <input type="color" id="color" value="#1c1c1f">
+          <input type="color" id="color" value="#000000">
         </div>
         <div class="option">
           <label for="bgcolor">Hintergrundfarbe</label>
@@ -338,7 +342,7 @@
         </div>
         <div class="option">
           <label for="darkcolor">Farbe (Dark Mode)</label>
-          <input type="color" id="darkcolor" value="#f0f0f0" disabled>
+          <input type="color" id="darkcolor" value="#ffffff" disabled>
         </div>
         <div class="option inline">
           <input type="checkbox" id="darkmode" aria-checked="true" checked>
@@ -351,7 +355,7 @@
       </p>
 
       <p class="hint" id="relativesizeHint" hidden>
-        <code>width</code>/<code>height</code> werden relativ zur oben eingestellten Schriftgröße geschrieben, statt in festen Pixeln. Dadurch skaliert die Formel automatisch mit der Schriftgröße, wenn das SVG-Markup direkt (inline) ins HTML eingebettet wird. Bei Einbindung per <code>&lt;img src="..."&gt;</code> greift das nicht &ndash; dort stattdessen im Stylesheet der Seite z.&nbsp;B. <code>img.formula { height: 1.1em; width: auto; }</code> setzen.
+        <code>width</code>/<code>height</code> werden relativ zur <em>Standardschriftgröße</em> geschrieben, statt in festen Pixeln. Ist das SVG-Markup direkt (inline) in eine Seite eingebettet, deren (Root-)Schriftgröße dieser Standardschriftgröße entspricht, erscheint die Formel genau so groß wie hier in der Vorschau und skaliert mit der Textgröße. Bei Einbindung per <code>&lt;img src="..."&gt;</code> greift das nicht &ndash; dort stattdessen im Stylesheet der Seite z.&nbsp;B. <code>img.formula { height: 1.1em; width: auto; }</code> setzen.
       </p>
 
       <p class="hint" id="remHint" hidden>
@@ -391,6 +395,7 @@
     const formulaEl = document.getElementById('formula');
     const modeEl = document.getElementById('mode');
     const fontsizeEl = document.getElementById('fontsize');
+    const basesizeEl = document.getElementById('basesize');
     const colorEl = document.getElementById('color');
     const bgcolorEl = document.getElementById('bgcolor');
     const bgtoggleEl = document.getElementById('bgtoggle');
@@ -455,7 +460,7 @@
       previewWrapEl.classList.toggle('opaque-bg', bgtoggleEl.checked && !darkmodeEl.checked);
       previewWrapEl.classList.toggle('dark-test', darkPreview);
       previewWrapEl.style.setProperty('--preview-bg', bgcolorEl.value);
-      previewEl.style.fontSize = fontsizeEl.value + 'px';
+      previewEl.style.fontSize = currentFontPx() + 'px';
       previewEl.style.color = darkPreview ? darkcolorEl.value : colorEl.value;
       updateDimsReadout();
     }
@@ -465,13 +470,14 @@
         dimsReadoutEl.textContent = '';
         return;
       }
-      // Read the actually rendered pixel size, since the "Größe" field only sets the
-      // font-size that the formula's ex-based proportions scale from — the real
-      // rendered height (especially for tall formulas like integrals with limits)
-      // is usually a multiple of that value, not equal to it.
+      // Show both the resolved font size (what the "Schriftgröße" field actually sets)
+      // and the resulting overall graphic size — these differ because tall constructs
+      // like an integral with limits span well beyond the font size (see the field's
+      // help text).
       const rect = currentSvg.getBoundingClientRect();
       dimsReadoutEl.textContent =
-        'Gerenderte Größe: ' + Math.round(rect.width) + ' × ' + Math.round(rect.height) + ' px';
+        'Schriftgröße: ' + Math.round(currentFontPx()) + ' px · ' +
+        'Grafik: ' + Math.round(rect.width) + ' × ' + Math.round(rect.height) + ' px';
     }
 
     async function render() {
@@ -522,20 +528,48 @@
       return n.toFixed(4).replace(/\.?0+$/, '');
     }
 
+    // Base font size (in px) that em/rem are measured against — e.g. the target page's
+    // standard font size. Irrelevant for the absolute units px/pt.
+    function currentBasePx() {
+      return parseFloat(basesizeEl.value) || 16;
+    }
+
+    // Resolve the chosen formula font size (value + unit) to an absolute px value that
+    // drives both the on-screen preview and the exported dimensions.
+    //   px  -> as-is
+    //   pt  -> 1pt = 96/72 px (CSS reference)
+    //   em/rem -> relative to the configurable base font size
+    function currentFontPx() {
+      const v = parseFloat(fontsizeEl.value) || 0;
+      switch (exportUnitEl.value) {
+        case 'pt': return v * 96 / 72;
+        case 'em':
+        case 'rem': return v * currentBasePx();
+        default: return v; // px
+      }
+    }
+
+    // Base size only affects em/rem; disable the field for the absolute units.
+    function updateBaseState() {
+      const rel = exportUnitEl.value === 'em' || exportUnitEl.value === 'rem';
+      basesizeEl.disabled = !rel;
+    }
+
     function buildExportSvg() {
       if (!currentSvg) return null;
       const clone = currentSvg.cloneNode(true);
       const rect = currentSvg.getBoundingClientRect();
 
       if (exportUnitEl.value === 'em' || exportUnitEl.value === 'rem') {
-        // Express width/height relative to the configured preview font size (in em
-        // or rem) instead of fixed pixels, so the formula scales with the surrounding
-        // text's font size when the SVG markup is embedded inline in HTML. (Has no
-        // effect when referenced via <img src="...">, since that isolates the SVG's
-        // CSS context — use CSS on the <img> element itself for that case instead.
-        // Also note: Firefox doesn't reliably support "rem" as an SVG width/height
-        // attribute unit, unlike Chrome/Safari/Edge — see remHint in the UI.)
-        const basePx = parseFloat(fontsizeEl.value) || 16;
+        // Express width/height in em/rem relative to the configured base font size, so
+        // the exported SVG renders at the same physical size the preview shows when
+        // embedded in a page whose (root) font size equals that base — and scales with
+        // it. Dividing the rendered px size by the base gives that em/rem value.
+        // (Has no effect when referenced via <img src="...">, since that isolates the
+        // SVG's CSS context — use CSS on the <img> element itself for that case.
+        // Also: Firefox doesn't reliably support "rem" as an SVG width/height unit,
+        // unlike Chrome/Safari/Edge — see remHint in the UI.)
+        const basePx = currentBasePx();
         const unit = exportUnitEl.value;
         clone.setAttribute('width', trimNum(rect.width / basePx) + unit);
         clone.setAttribute('height', trimNum(rect.height / basePx) + unit);
@@ -628,7 +662,7 @@
     });
 
     [formulaEl, modeEl].forEach(el => el.addEventListener('input', scheduleRender));
-    [fontsizeEl, colorEl, bgcolorEl, bgtoggleEl, darkcolorEl].forEach(el => el.addEventListener('input', () => {
+    [fontsizeEl, basesizeEl, colorEl, bgcolorEl, bgtoggleEl, darkcolorEl].forEach(el => el.addEventListener('input', () => {
       updatePreviewChrome();
       setStatus('');
     }));
@@ -642,6 +676,8 @@
       const unit = exportUnitEl.value;
       relativesizeHintEl.hidden = !(unit === 'em' || unit === 'rem');
       remHintEl.hidden = unit !== 'rem';
+      updateBaseState();
+      updatePreviewChrome(); // resolved font px depends on the unit
       setStatus('');
     });
 
@@ -659,6 +695,7 @@
     // the markup (e.g. darkmode checked or "rem" preselected by default), since the
     // above listeners only fire on user-triggered "change" events, not on load.
     updateDarkModeUI();
+    updateBaseState();
     relativesizeHintEl.hidden = !(exportUnitEl.value === 'em' || exportUnitEl.value === 'rem');
     remHintEl.hidden = exportUnitEl.value !== 'rem';
 
