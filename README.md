@@ -10,11 +10,14 @@ Type something like:
 
 … and get a clean, scalable vector graphic you can drop into a slide deck, a blog post, or a design tool.
 
+Don't have the LaTeX handy? **Drop, paste, or pick an image of a formula** and Formulator recognizes it into LaTeX for you — entirely in your browser, no upload.
+
 Not sure what LaTeX syntax is supported? See MathJax's [supported TeX/LaTeX commands](https://docs.mathjax.org/en/latest/input/tex/macros/index.html) reference.
 
 ## Features
 
 - **Live preview** — renders as you type, powered by [MathJax](https://www.mathjax.org/) in SVG output mode (true vector paths, not HTML/CSS — so the exported file is portable and font-independent).
+- **Image → LaTeX (OCR)** — drop, paste (Ctrl/Cmd+V), or pick a screenshot/photo of a formula and it's recognized into LaTeX in the browser via the [Texo / FormulaNet](https://github.com/alephpi/Texo) model ([Transformers.js](https://github.com/huggingface/transformers.js)). The image never leaves your machine; the ~80 MB model is downloaded once from the Hugging Face CDN and then cached.
 - **Display or inline mode** for different formula layouts.
 - **Font size with selectable unit** — set the formula's font size in `px`, `pt`, `em`, or `rem`. The chosen unit drives both the preview and the exported `width`/`height`. Relative units (`em`/`rem`) are measured against a configurable **base font size**, so `2em` at an 11 px base renders at 22 px — and, when embedded inline, scales with the surrounding text.
 - **Live size readout** — shows the resolved font size and the resulting overall graphic dimensions (which differ, since tall constructs like an integral with limits span well beyond the font size).
@@ -32,6 +35,9 @@ Open formulator.html directly in any modern browser. That’s it – no build st
 
 Alternatively try the always up-to-date [app on GitHub Pages](https://607011.github.io/Formulator/).
 
+### Recognize a formula from an image
+
+Drop an image onto the intake zone below the formula field, paste one from the clipboard (Ctrl/Cmd+V), or click to pick a file. The formula is recognized into LaTeX and rendered right away. Recognition runs fully in the browser; on first use it downloads the ~80 MB model from the Hugging Face CDN (cached afterwards). It works best on clearly printed formulas — always double-check the result.
 
 ## Dark mode notes
 
@@ -55,5 +61,17 @@ Note that Firefox does not reliably support `rem` as an SVG `width`/`height` uni
 ## Tech details
 
 - Rendering engine: [MathJax 3](https://www.mathjax.org/) (`tex-svg` combined component), configured with the `ams` and `boldsymbol` packages, plus the `a11y/semantic-enrich` extension for spoken-math generation.
+- Image OCR: the [FormulaNet](https://huggingface.co/alephpi/FormulaNet) model (a 20 M-parameter vision-encoder-decoder from the [Texo](https://github.com/alephpi/Texo) project) run via [Transformers.js](https://github.com/huggingface/transformers.js). Because the model ships no `preprocessor_config.json`, the app reproduces Texo's `EvalMERImageProcessor` preprocessing (crop margins → fit into 384×384 with black padding → grayscale → normalize) on a `<canvas>` and feeds the pixel values to the model directly.
 - Exported SVGs use proper namespace-declaration attributes (`xmlns`, `xmlns:xlink`) so they serialize as valid, standalone XML — no duplicate namespaces, no mangled `xlink:href` references.
-- All rendering happens client-side; no formula data is sent anywhere (the only network requests are for the MathJax library and its on-demand speech-locale data from the CDN).
+- All computation happens client-side; your formulas and images are never uploaded. The only network requests are downloads of the libraries and models themselves (MathJax + its speech-locale data, Transformers.js, and the OCR model weights) from their CDNs.
+
+## License
+
+Formulator is licensed under the **GNU Affero General Public License v3.0** (AGPL-3.0) — see [`LICENSE`](LICENSE). Because it uses the AGPL-licensed FormulaNet model, deploying Formulator as a network service requires offering its complete corresponding source under the AGPL to users of that service.
+
+## Acknowledgements
+
+- [MathJax](https://www.mathjax.org/) — LaTeX rendering and the Speech Rule Engine for accessibility.
+- [Texo / FormulaNet](https://github.com/alephpi/Texo) by Sicheng Mao — the in-browser LaTeX OCR model (AGPL-3.0).
+- [Transformers.js](https://github.com/huggingface/transformers.js) — running the OCR model in the browser.
+- [LaTeX-OCR (pix2tex)](https://github.com/lukas-blecher/LaTeX-OCR) — the inspiration for the image-to-LaTeX feature.

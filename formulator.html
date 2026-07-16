@@ -307,6 +307,61 @@
       color: var(--muted);
       margin-top: 24px;
     }
+
+    .ocr-zone {
+      margin-top: 12px;
+      border: 1.5px dashed var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      cursor: pointer;
+      background: #fbfbfc;
+      transition: border-color 0.15s ease, background 0.15s ease;
+      text-align: center;
+    }
+
+    .ocr-zone:hover,
+    .ocr-zone:focus-visible {
+      border-color: var(--accent);
+      outline: none;
+    }
+
+    .ocr-zone.dragover {
+      border-color: var(--accent);
+      background: #eef1ff;
+    }
+
+    .ocr-inner {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .ocr-icon {
+      font-size: 15px;
+    }
+
+    .ocr-text {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .ocr-sub {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .ocr-thumb {
+      max-height: 54px;
+      max-width: 40%;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #fff;
+    }
   </style>
 </head>
 
@@ -318,6 +373,18 @@
     <div class="panel">
       <label for="formula">LaTeX-Formel</label>
       <textarea id="formula" spellcheck="false">\int_{-\infty}^{\infty} e^{-x^2}\,dx = \sqrt{\pi}</textarea>
+
+      <div class="ocr-zone" id="ocrZone" tabindex="0"
+        title="Bild einer Formel hier ablegen, einfügen (Strg/Cmd+V) oder klicken zum Auswählen">
+        <input type="file" id="ocrFile" accept="image/*" hidden>
+        <div class="ocr-inner" id="ocrInner">
+          <span class="ocr-icon" aria-hidden="true">🖼️➜ƒ(x)</span>
+          <span class="ocr-text">Formel-Bild hierher ziehen, einfügen (Strg/Cmd&nbsp;+&nbsp;V) oder klicken</span>
+          <span class="ocr-sub">wird lokal im Browser per Texo-Modell zu LaTeX erkannt</span>
+        </div>
+        <img id="ocrThumb" class="ocr-thumb" alt="" hidden>
+      </div>
+      <p class="hint" id="ocrStatus" hidden></p>
 
       <div class="options">
         <div class="option">
@@ -457,6 +524,10 @@
     const statusEl = document.getElementById('status');
     const downloadBtn = document.getElementById('downloadBtn');
     const copyBtn = document.getElementById('copyBtn');
+    const ocrZoneEl = document.getElementById('ocrZone');
+    const ocrFileEl = document.getElementById('ocrFile');
+    const ocrThumbEl = document.getElementById('ocrThumb');
+    const ocrStatusEl = document.getElementById('ocrStatus');
 
     let currentSvg = null;
     let currentSpeech = '';
@@ -849,6 +920,233 @@
     // its 'load' event rather than assuming `MathJax.startup` already exists.
     document.getElementById('mathjax-script').addEventListener('load', () => {
       MathJax.startup.promise.then(render);
+    });
+
+    /* ===================================================================
+       Formel-Bild → LaTeX (OCR), vollständig im Browser via Texo-Modell
+       (alephpi/FormulaNet) über Transformers.js. Läuft lokal, kein Server;
+       das ~80 MB-Modell wird beim ersten Mal vom HF-CDN geladen und danach
+       vom Browser gecacht. Die Erkennung ist vom übrigen App-Zustand
+       entkoppelt: schlägt sie fehl, bleibt der Rest voll funktionsfähig.
+       =================================================================== */
+    const OCR_MODEL_ID = 'alephpi/FormulaNet';
+    const TRANSFORMERS_URL = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3';
+    // FormulaNet was trained with UniMERNet's EvalMER image processor:
+    // RGB → crop white margins → fit into a 384×384 box (longer side = 384) →
+    // pad the rest black → grayscale → normalize with these mean/std. We replicate
+    // it here with a <canvas> because the HF repo ships no preprocessor_config.json.
+    const OCR_SIZE = 384;
+    const UNIMERNET_MEAN = 0.7931;
+    const UNIMERNET_STD = 0.1738;
+    let ocrModelPromise = null; // lazily created on first use
+    let TensorCtor = null;
+    let ocrBusy = false;
+
+    function setOcrStatus(msg, kind) {
+      if (!msg) {
+        ocrStatusEl.hidden = true;
+        ocrStatusEl.textContent = '';
+        return;
+      }
+      ocrStatusEl.hidden = false;
+      ocrStatusEl.textContent = msg;
+      ocrStatusEl.style.color = kind === 'error' ? 'var(--error)'
+        : kind === 'ok' ? 'var(--accent)' : 'var(--muted)';
+    }
+
+    // Load Transformers.js (ESM) + tokenizer + model once. We deliberately avoid the
+    // high-level image-to-text pipeline (it requires preprocessor_config.json, which
+    // this model lacks) and drive the raw model with pixel values we build ourselves.
+    async function getOcrModel() {
+      if (!ocrModelPromise) {
+        ocrModelPromise = (async () => {
+          const mod = await import(/* @vite-ignore */ TRANSFORMERS_URL);
+          const { AutoTokenizer, AutoModelForVision2Seq, Tensor, env } = mod;
+          env.allowLocalModels = false; // only remote (HF Hub) weights
+          TensorCtor = Tensor;
+          const progress_callback = (p) => {
+            if (p && p.status === 'progress' && p.file && typeof p.progress === 'number') {
+              setOcrStatus(`Modell wird geladen … ${p.file} ${Math.round(p.progress)}%`);
+            }
+          };
+          const [tokenizer, model] = await Promise.all([
+            AutoTokenizer.from_pretrained(OCR_MODEL_ID, { progress_callback }),
+            // Only fp32 ONNX weights exist in the repo, so pin dtype to fp32.
+            AutoModelForVision2Seq.from_pretrained(OCR_MODEL_ID, { dtype: 'fp32', progress_callback })
+          ]);
+          return { tokenizer, model };
+        })().catch((err) => {
+          ocrModelPromise = null; // allow retry on next attempt
+          throw err;
+        });
+      }
+      return ocrModelPromise;
+    }
+
+    // Grayscale luminance as PIL's "L" conversion (ITU-R 601-2).
+    function luma(r, g, b) {
+      return 0.299 * r + 0.587 * g + 0.114 * b;
+    }
+
+    // Replicate EvalMERImageProcessor.crop_margin: contrast-stretch a grayscale copy,
+    // threshold dark pixels (< 200) as "text", and return their bounding box.
+    function cropMarginBox(data, w, h) {
+      let min = 255, max = 0;
+      for (let i = 0; i < w * h; i++) {
+        const l = luma(data[i * 4], data[i * 4 + 1], data[i * 4 + 2]);
+        if (l < min) min = l;
+        if (l > max) max = l;
+      }
+      if (max === min) return { x: 0, y: 0, w, h };
+      let minX = w, minY = h, maxX = -1, maxY = -1;
+      const span = max - min;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const i = y * w + x;
+          const l = luma(data[i * 4], data[i * 4 + 1], data[i * 4 + 2]);
+          const norm = (l - min) / span * 255;
+          if (norm < 200) { // text pixel
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (maxX < 0) return { x: 0, y: 0, w, h };
+      return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+    }
+
+    // Full EvalMER preprocessing → Float32 pixel-values tensor [1, 3, 384, 384].
+    function preprocessToTensor(img) {
+      const nw = img.naturalWidth || img.width;
+      const nh = img.naturalHeight || img.height;
+      const src = document.createElement('canvas');
+      src.width = nw; src.height = nh;
+      const sctx = src.getContext('2d', { willReadFrequently: true });
+      sctx.drawImage(img, 0, 0);
+      const box = cropMarginBox(sctx.getImageData(0, 0, nw, nh).data, nw, nh);
+
+      // Fit the cropped region into 384×384 (longer side = 384), then black-pad centered.
+      const scale = OCR_SIZE / Math.max(box.w, box.h);
+      const newW = Math.max(1, Math.round(box.w * scale));
+      const newH = Math.max(1, Math.round(box.h * scale));
+      const padLeft = Math.floor((OCR_SIZE - newW) / 2);
+      const padTop = Math.floor((OCR_SIZE - newH) / 2);
+
+      const out = document.createElement('canvas');
+      out.width = OCR_SIZE; out.height = OCR_SIZE;
+      const octx = out.getContext('2d', { willReadFrequently: true });
+      octx.fillStyle = '#000'; // black padding, per the reference processor
+      octx.fillRect(0, 0, OCR_SIZE, OCR_SIZE);
+      octx.imageSmoothingEnabled = true;
+      octx.imageSmoothingQuality = 'high';
+      octx.drawImage(img, box.x, box.y, box.w, box.h, padLeft, padTop, newW, newH);
+
+      const px = octx.getImageData(0, 0, OCR_SIZE, OCR_SIZE).data;
+      const N = OCR_SIZE * OCR_SIZE;
+      const chw = new Float32Array(3 * N);
+      for (let i = 0; i < N; i++) {
+        // ToGray then Normalize((g/255) - mean) / std; all 3 channels identical.
+        const g = luma(px[i * 4], px[i * 4 + 1], px[i * 4 + 2]);
+        const v = (g / 255 - UNIMERNET_MEAN) / UNIMERNET_STD;
+        chw[i] = v; chw[N + i] = v; chw[2 * N + i] = v;
+      }
+      return new TensorCtor('float32', chw, [1, 3, OCR_SIZE, OCR_SIZE]);
+    }
+
+    // Light cleanup of the model's raw output into KaTeX/MathJax-friendly LaTeX.
+    function cleanOcrLatex(raw) {
+      let s = (raw || '').trim();
+      // The model is trained on spaced tokens ("x ^ { 2 }"); collapse runs of spaces.
+      s = s.replace(/\s+/g, ' ').trim();
+      return s;
+    }
+
+    function loadImageEl(url) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('Bild konnte nicht geladen werden.'));
+        img.src = url;
+      });
+    }
+
+    async function recognizeImage(url) {
+      if (ocrBusy) return;
+      ocrBusy = true;
+      ocrZoneEl.classList.remove('dragover');
+      try {
+        setOcrStatus('Modell wird vorbereitet … (erster Aufruf lädt ~80 MB)');
+        const { tokenizer, model } = await getOcrModel();
+        const img = await loadImageEl(url);
+        setOcrStatus('Formel wird erkannt …');
+        const pixelValues = preprocessToTensor(img);
+        const generated = await model.generate({ pixel_values: pixelValues, max_new_tokens: 512 });
+        const decoded = tokenizer.batch_decode(generated, { skip_special_tokens: true });
+        const latex = cleanOcrLatex(Array.isArray(decoded) ? decoded[0] : decoded);
+        if (!latex) {
+          setOcrStatus('Keine Formel erkannt. Anderes/schärferes Bild versuchen.', 'error');
+          return;
+        }
+        formulaEl.value = latex;
+        render();
+        setOcrStatus(`Erkannt: ${latex}`, 'ok');
+      } catch (err) {
+        console.error(err);
+        setOcrStatus('Erkennung fehlgeschlagen: ' + (err && err.message ? err.message : String(err)), 'error');
+      } finally {
+        ocrBusy = false;
+      }
+    }
+
+    // Show a small thumbnail of the dropped/pasted image, then recognize it.
+    function handleImageBlob(blob) {
+      if (!blob || !blob.type || !blob.type.startsWith('image/')) {
+        setOcrStatus('Das war kein Bild.', 'error');
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      ocrThumbEl.src = url;
+      ocrThumbEl.hidden = false;
+      recognizeImage(url);
+    }
+
+    // --- Wiring: click to pick, file input, drag & drop, clipboard paste ---
+    ocrZoneEl.addEventListener('click', () => ocrFileEl.click());
+    ocrZoneEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ocrFileEl.click(); }
+    });
+    ocrFileEl.addEventListener('change', () => {
+      if (ocrFileEl.files && ocrFileEl.files[0]) handleImageBlob(ocrFileEl.files[0]);
+      ocrFileEl.value = '';
+    });
+
+    ['dragenter', 'dragover'].forEach(evt =>
+      ocrZoneEl.addEventListener(evt, (e) => {
+        e.preventDefault();
+        ocrZoneEl.classList.add('dragover');
+      }));
+    ['dragleave', 'dragend'].forEach(evt =>
+      ocrZoneEl.addEventListener(evt, () => ocrZoneEl.classList.remove('dragover')));
+    ocrZoneEl.addEventListener('drop', (e) => {
+      e.preventDefault();
+      ocrZoneEl.classList.remove('dragover');
+      const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (file) handleImageBlob(file);
+    });
+
+    // Global paste: if the clipboard holds an image, grab it for OCR.
+    document.addEventListener('paste', (e) => {
+      const items = e.clipboardData && e.clipboardData.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type && item.type.startsWith('image/')) {
+          const blob = item.getAsFile();
+          if (blob) { e.preventDefault(); handleImageBlob(blob); }
+          break;
+        }
+      }
     });
   </script>
 </body>
