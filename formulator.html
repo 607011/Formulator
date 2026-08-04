@@ -421,6 +421,9 @@
         <img id="ocrThumb" class="ocr-thumb" alt="" hidden>
       </div>
       <p class="hint" id="ocrStatus" hidden></p>
+      <p class="hint" data-i18n="hint_mathml">Tipp: Auch als MathML kopierte Formeln (z. B. aus Word, LibreOffice Math
+        oder von MathJax-Webseiten) können direkt eingefügt werden (Strg/Cmd+V) — sie werden automatisch in LaTeX
+        umgewandelt.</p>
 
       <div class="options">
         <div class="option">
@@ -619,7 +622,10 @@
         ocr_recognized: 'Erkannt: {latex}',
         ocr_failed: 'Erkennung fehlgeschlagen: {msg}',
         ocr_not_image: 'Das war kein Bild.',
-        ocr_img_load_failed: 'Bild konnte nicht geladen werden.'
+        ocr_img_load_failed: 'Bild konnte nicht geladen werden.',
+        hint_mathml: 'Tipp: Auch als MathML kopierte Formeln (z. B. aus Word, LibreOffice Math oder von MathJax-Webseiten) können direkt eingefügt werden (Strg/Cmd+V) — sie werden automatisch in LaTeX umgewandelt.',
+        status_mathml_pasted: 'MathML erkannt und in LaTeX umgewandelt.',
+        status_mathml_failed: 'MathML konnte nicht gelesen werden.'
       },
       en: {
         page_title: 'Formulator — formula to SVG',
@@ -671,7 +677,10 @@
         ocr_recognized: 'Recognized: {latex}',
         ocr_failed: 'Recognition failed: {msg}',
         ocr_not_image: 'That was not an image.',
-        ocr_img_load_failed: 'Image could not be loaded.'
+        ocr_img_load_failed: 'Image could not be loaded.',
+        hint_mathml: 'Tip: formulas copied as MathML (e.g. from Word, LibreOffice Math, or MathJax-rendered web pages) can be pasted directly (Ctrl/Cmd+V) — they are automatically converted to LaTeX.',
+        status_mathml_pasted: 'MathML detected and converted to LaTeX.',
+        status_mathml_failed: 'Could not read the MathML.'
       }
     };
     let lang = 'de';
@@ -1336,6 +1345,237 @@
       recognizeImage(url);
     }
 
+    /* ===================================================================
+       MathML → LaTeX
+       Converts pasted Presentation MathML (as produced by Word, LibreOffice
+       Math, or copied off a MathJax-rendered web page) into LaTeX. If the
+       MathML carries a <semantics><annotation encoding="application/x-tex">
+       (common for MathJax output), that original TeX source is used verbatim
+       instead of reconstructing it structurally.
+       =================================================================== */
+    const MATHML_UNICODE_TO_LATEX = {
+      'α': '\\alpha', 'β': '\\beta', 'γ': '\\gamma', 'δ': '\\delta', 'ε': '\\epsilon', 'ζ': '\\zeta',
+      'η': '\\eta', 'θ': '\\theta', 'ι': '\\iota', 'κ': '\\kappa', 'λ': '\\lambda', 'μ': '\\mu',
+      'ν': '\\nu', 'ξ': '\\xi', 'π': '\\pi', 'ρ': '\\rho', 'σ': '\\sigma', 'τ': '\\tau',
+      'υ': '\\upsilon', 'φ': '\\varphi', 'ϕ': '\\phi', 'χ': '\\chi', 'ψ': '\\psi', 'ω': '\\omega',
+      'ϑ': '\\vartheta', 'ϖ': '\\varpi', 'ϱ': '\\varrho', 'ς': '\\varsigma', 'ϵ': '\\varepsilon',
+      'Γ': '\\Gamma', 'Δ': '\\Delta', 'Θ': '\\Theta', 'Λ': '\\Lambda', 'Ξ': '\\Xi', 'Π': '\\Pi',
+      'Σ': '\\Sigma', 'Υ': '\\Upsilon', 'Φ': '\\Phi', 'Ψ': '\\Psi', 'Ω': '\\Omega',
+      '±': '\\pm', '∓': '\\mp', '×': '\\times', '÷': '\\div', '·': '\\cdot', '⋅': '\\cdot',
+      '∘': '\\circ', '∙': '\\bullet', '⊕': '\\oplus', '⊗': '\\otimes', '⊘': '\\oslash', '⊙': '\\odot',
+      '≤': '\\leq', '≥': '\\geq', '≠': '\\neq', '≈': '\\approx', '≡': '\\equiv', '∼': '\\sim',
+      '≃': '\\simeq', '≅': '\\cong', '∝': '\\propto', '≪': '\\ll', '≫': '\\gg',
+      '∈': '\\in', '∉': '\\notin', '∋': '\\ni', '⊂': '\\subset', '⊃': '\\supset',
+      '⊆': '\\subseteq', '⊇': '\\supseteq', '∪': '\\cup', '∩': '\\cap', '∖': '\\setminus',
+      '∅': '\\emptyset', '∀': '\\forall', '∃': '\\exists', '¬': '\\neg', '∧': '\\land', '∨': '\\lor',
+      '⇒': '\\Rightarrow', '⇐': '\\Leftarrow', '⇔': '\\Leftrightarrow',
+      '→': '\\to', '←': '\\leftarrow', '↔': '\\leftrightarrow', '↦': '\\mapsto',
+      '↑': '\\uparrow', '↓': '\\downarrow',
+      '∑': '\\sum', '∏': '\\prod', '∐': '\\coprod', '⋃': '\\bigcup', '⋂': '\\bigcap',
+      '∫': '\\int', '∬': '\\iint', '∭': '\\iiint', '∮': '\\oint',
+      '√': '\\sqrt', '∞': '\\infty', '∂': '\\partial', '∇': '\\nabla',
+      'ℝ': '\\mathbb{R}', 'ℕ': '\\mathbb{N}', 'ℤ': '\\mathbb{Z}', 'ℚ': '\\mathbb{Q}', 'ℂ': '\\mathbb{C}',
+      '∴': '\\therefore', '∵': '\\because', '∠': '\\angle', '⊥': '\\perp', '∥': '\\parallel',
+      '…': '\\ldots', '⋯': '\\cdots', '⋮': '\\vdots', '⋱': '\\ddots',
+      '⌈': '\\lceil', '⌉': '\\rceil', '⌊': '\\lfloor', '⌋': '\\rfloor',
+      '⟨': '\\langle', '⟩': '\\rangle', '⊎': '\\uplus', '⊑': '\\sqsubseteq', '⊒': '\\sqsupseteq',
+      '°': '^\\circ', '−': '-'
+    };
+    const MATHML_ACCENT_OVER = {
+      '^': 'hat', 'ˆ': 'hat', '¯': 'bar', '‾': 'bar', '→': 'vec', '~': 'tilde', '˜': 'tilde',
+      '.': 'dot', '˙': 'dot', '..': 'ddot', '¨': 'ddot', 'ˇ': 'check', '˘': 'breve'
+    };
+    const MATHML_ACCENT_UNDER = { '‾': 'overline' };
+    const MATHML_KNOWN_TEX_FUNCTIONS = new Set([
+      'sin', 'cos', 'tan', 'cot', 'sec', 'csc', 'sinh', 'cosh', 'tanh', 'coth',
+      'arcsin', 'arccos', 'arctan', 'ln', 'lg', 'log', 'exp', 'min', 'max', 'sup', 'inf',
+      'lim', 'det', 'gcd', 'deg', 'dim', 'ker', 'hom', 'mod', 'arg', 'Pr'
+    ]);
+
+    function mathmlMapSymbol(ch) {
+      return Object.prototype.hasOwnProperty.call(MATHML_UNICODE_TO_LATEX, ch) ? MATHML_UNICODE_TO_LATEX[ch] : ch;
+    }
+
+    // Escape characters with special meaning in LaTeX text mode (\text{...}, \operatorname{...}).
+    function mathmlEscapeText(s) {
+      return (s || '').replace(/[\\#$%&_{}~^]/g, (c) => {
+        switch (c) {
+          case '\\': return '\\textbackslash{}';
+          case '~': return '\\textasciitilde{}';
+          case '^': return '\\textasciicircum{}';
+          default: return '\\' + c;
+        }
+      });
+    }
+
+    // Escape characters with special meaning in LaTeX math mode (used for stray <mo> content
+    // that isn't in the symbol table, e.g. a literal "&" or "_" left in the source).
+    function mathmlEscapeMathChar(c) {
+      switch (c) {
+        case '#': return '\\#'; case '$': return '\\$'; case '%': return '\\%';
+        case '&': return '\\&'; case '_': return '\\_'; case '{': return '\\{';
+        case '}': return '\\}'; case '~': return '\\textasciitilde{}';
+        case '^': return '\\textasciicircum{}'; case '\\': return '\\backslash';
+        default: return c;
+      }
+    }
+
+    function mathmlConvertChildren(node) {
+      return Array.from(node.children).map(mathmlConvertNode).join(' ');
+    }
+
+    function mathmlConvertMi(node) {
+      const s = node.textContent || '';
+      const variant = node.getAttribute('mathvariant');
+      if ([...s].length === 1) {
+        const mapped = mathmlMapSymbol(s);
+        return variant === 'bold' ? `\\boldsymbol{${mapped}}` : mapped;
+      }
+      if (MATHML_KNOWN_TEX_FUNCTIONS.has(s)) return '\\' + s;
+      if (variant === 'normal') return `\\mathrm{${mathmlEscapeText(s)}}`;
+      return mathmlEscapeText(s); // multi-letter identifier; left bare, like <mi> renders by default (italic)
+    }
+
+    function mathmlConvertMn(node) {
+      return [...(node.textContent || '')].map(mathmlMapSymbol).join('');
+    }
+
+    function mathmlConvertMo(node) {
+      const s = node.textContent || '';
+      if ([...s].length === 1) {
+        const mapped = mathmlMapSymbol(s);
+        return mapped === s ? mathmlEscapeMathChar(s) : mapped;
+      }
+      return [...s].map(mathmlMapSymbol).join('');
+    }
+
+    function mathmlAccentFor(node, map) {
+      if (!node || node.tagName.toLowerCase() !== 'mo') return null;
+      return map[(node.textContent || '').trim()] || null;
+    }
+
+    const MATHML_DELIMITERS = { '(': '(', ')': ')', '[': '[', ']': ']', '{': '\\{', '}': '\\}', '|': '|', '‖': '\\|' };
+
+    function mathmlConvertMfenced(node) {
+      const open = node.hasAttribute('open') ? node.getAttribute('open') : '(';
+      const close = node.hasAttribute('close') ? node.getAttribute('close') : ')';
+      const seps = (node.getAttribute('separators') ?? ',').replace(/\s+/g, '');
+      const children = Array.from(node.children).map(mathmlConvertNode);
+      let inner = '';
+      children.forEach((c, i) => {
+        inner += c;
+        if (i < children.length - 1) inner += (seps[Math.min(i, seps.length - 1)] || ',') + ' ';
+      });
+      if (!open && !close) return inner;
+      const openLatex = open ? (MATHML_DELIMITERS[open] || open) : '.';
+      const closeLatex = close ? (MATHML_DELIMITERS[close] || close) : '.';
+      return `\\left${openLatex}${inner}\\right${closeLatex}`;
+    }
+
+    function mathmlConvertMtable(node) {
+      const rows = Array.from(node.children).filter(c => ['mtr', 'mlabeledtr'].includes(c.tagName.toLowerCase()));
+      return `\\begin{matrix}${rows.map(mathmlConvertNode).join(' \\\\ ')}\\end{matrix}`;
+    }
+
+    function mathmlConvertNode(node) {
+      if (!node || node.nodeType !== 1) return '';
+      switch (node.tagName.toLowerCase()) {
+        case 'math': case 'mrow': case 'mstyle': case 'mpadded': case 'merror': case 'menclose':
+          return mathmlConvertChildren(node);
+        case 'semantics': return mathmlConvertNode(node.children[0]);
+        case 'mi': return mathmlConvertMi(node);
+        case 'mn': return mathmlConvertMn(node);
+        case 'mo': return mathmlConvertMo(node);
+        case 'mtext': return `\\text{${mathmlEscapeText(node.textContent || '')}}`;
+        case 'mspace': return '\\,';
+        case 'mfrac': {
+          const [num, den] = node.children;
+          return `\\frac{${mathmlConvertNode(num)}}{${mathmlConvertNode(den)}}`;
+        }
+        case 'msqrt': return `\\sqrt{${mathmlConvertChildren(node)}}`;
+        case 'mroot': {
+          const [base, index] = node.children;
+          return `\\sqrt[${mathmlConvertNode(index)}]{${mathmlConvertNode(base)}}`;
+        }
+        case 'msub': {
+          const [base, sub] = node.children;
+          return `{${mathmlConvertNode(base)}}_{${mathmlConvertNode(sub)}}`;
+        }
+        case 'msup': {
+          const [base, sup] = node.children;
+          return `{${mathmlConvertNode(base)}}^{${mathmlConvertNode(sup)}}`;
+        }
+        case 'msubsup': {
+          const [base, sub, sup] = node.children;
+          return `{${mathmlConvertNode(base)}}_{${mathmlConvertNode(sub)}}^{${mathmlConvertNode(sup)}}`;
+        }
+        case 'munder': {
+          const [base, under] = node.children;
+          const acc = mathmlAccentFor(under, MATHML_ACCENT_UNDER);
+          return acc ? `\\${acc}{${mathmlConvertNode(base)}}` : `{${mathmlConvertNode(base)}}_{${mathmlConvertNode(under)}}`;
+        }
+        case 'mover': {
+          const [base, over] = node.children;
+          const acc = mathmlAccentFor(over, MATHML_ACCENT_OVER);
+          return acc ? `\\${acc}{${mathmlConvertNode(base)}}` : `{${mathmlConvertNode(base)}}^{${mathmlConvertNode(over)}}`;
+        }
+        case 'munderover': {
+          const [base, under, over] = node.children;
+          return `{${mathmlConvertNode(base)}}_{${mathmlConvertNode(under)}}^{${mathmlConvertNode(over)}}`;
+        }
+        case 'mfenced': return mathmlConvertMfenced(node);
+        case 'mtable': return mathmlConvertMtable(node);
+        case 'mtr': case 'mlabeledtr':
+          return Array.from(node.children).filter(c => c.tagName.toLowerCase() === 'mtd').map(mathmlConvertNode).join(' & ');
+        case 'mtd': return mathmlConvertChildren(node);
+        default: return mathmlConvertChildren(node);
+      }
+    }
+
+    function mathmlToLatex(mathEl) {
+      const tex = mathEl.querySelector(
+        'annotation[encoding="application/x-tex"], annotation[encoding="application/tex"], annotation[encoding="TeX"]'
+      );
+      if (tex && tex.textContent && tex.textContent.trim()) return tex.textContent.trim();
+      return mathmlConvertChildren(mathEl).trim();
+    }
+
+    // Pull a <math>...</math> fragment out of clipboard data, in whichever of the flavors a
+    // paste actually offers it (explicit XML MIME type, embedded in an HTML clip, or as raw
+    // text). Parsed via the HTML parser (not an XML parser): real-world clips from Word/
+    // LibreOffice are not well-formed XML, and HTML5's parser has native, lenient support for
+    // embedded MathML foreign content.
+    function extractMathMLFromClipboard(cd) {
+      const direct = cd.getData('application/mathml+xml') || cd.getData('text/xml') || cd.getData('application/xml');
+      if (direct && /<math[\s>]/i.test(direct)) return direct;
+
+      const html = cd.getData('text/html');
+      if (html) {
+        const m = html.match(/<math[\s\S]*?<\/math\s*>/i);
+        if (m) return m[0];
+      }
+
+      const text = cd.getData('text/plain');
+      if (text && /^\s*<math[\s>]/i.test(text.trim())) return text.trim();
+
+      return null;
+    }
+
+    function handleMathMLPaste(raw) {
+      try {
+        const doc = new DOMParser().parseFromString(`<!DOCTYPE html><body>${raw}</body>`, 'text/html');
+        const mathEl = doc.querySelector('math');
+        const latex = mathEl ? mathmlToLatex(mathEl) : '';
+        if (!latex) throw new Error('no MathML content recognized');
+        formulaEl.value = latex;
+        render();
+        setStatus(t('status_mathml_pasted'), true);
+      } catch (err) {
+        console.error(err);
+        setStatus(t('status_mathml_failed'));
+      }
+    }
+
     // --- Wiring: click to pick, file input, drag & drop, clipboard paste ---
     ocrZoneEl.addEventListener('click', () => ocrFileEl.click());
     ocrZoneEl.addEventListener('keydown', (e) => {
@@ -1360,9 +1600,20 @@
       if (file) handleImageBlob(file);
     });
 
-    // Global paste: if the clipboard holds an image, grab it for OCR.
+    // Global paste: MathML (e.g. copied from Word, LibreOffice Math, or a MathJax-rendered
+    // web page) is converted straight to LaTeX; failing that, an image is grabbed for OCR.
     document.addEventListener('paste', (e) => {
-      const items = e.clipboardData && e.clipboardData.items;
+      const cd = e.clipboardData;
+      if (!cd) return;
+
+      const mathml = extractMathMLFromClipboard(cd);
+      if (mathml) {
+        e.preventDefault();
+        handleMathMLPaste(mathml);
+        return;
+      }
+
+      const items = cd.items;
       if (!items) return;
       for (const item of items) {
         if (item.type && item.type.startsWith('image/')) {
