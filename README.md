@@ -10,7 +10,7 @@ Type something like:
 
 … and get a clean, scalable vector graphic you can drop into a slide deck, a blog post, or a design tool.
 
-Don't have the LaTeX handy? **Drop, paste, or pick an image of a formula** and Formulator recognizes it into LaTeX for you — entirely in your browser, no upload.
+Don't have the LaTeX handy? **Drop, paste, or pick an image of a formula** and Formulator recognizes it into LaTeX for you — entirely in your browser, no upload. Got **MathML** instead (copied from Word, LibreOffice Math, or a MathJax-rendered web page)? Just paste it (Ctrl/Cmd+V) — it's converted to LaTeX automatically.
 
 Not sure what LaTeX syntax is supported? See MathJax's [supported TeX/LaTeX commands](https://docs.mathjax.org/en/latest/input/tex/macros/index.html) reference.
 
@@ -18,6 +18,7 @@ Not sure what LaTeX syntax is supported? See MathJax's [supported TeX/LaTeX comm
 
 - **Live preview** — renders as you type, powered by [MathJax](https://www.mathjax.org/) in SVG output mode (true vector paths, not HTML/CSS — so the exported file is portable and font-independent).
 - **Image → LaTeX (OCR)** — drop, paste (Ctrl/Cmd+V), or pick a screenshot/photo of a formula and it's recognized into LaTeX in the browser via the [Texo / FormulaNet](https://github.com/alephpi/Texo) model ([Transformers.js](https://github.com/huggingface/transformers.js)). The image never leaves your machine; the ~80 MB model is downloaded once from the Hugging Face CDN and then cached.
+- **MathML → LaTeX** — paste MathML (e.g. copied from Word, LibreOffice Math, or a MathJax-rendered web page) and it's converted to LaTeX directly, no OCR involved. If the MathML carries the original TeX source as a `<annotation encoding="application/x-tex">` (common with MathJax), that's used verbatim; otherwise it's reconstructed structurally from the presentation markup.
 - **Display or inline mode** for different formula layouts.
 - **Font size with selectable unit** — set the formula's font size in `px`, `pt`, `em`, or `rem`. The chosen unit drives both the preview and the exported `width`/`height`. Relative units (`em`/`rem`) are measured against a configurable **base font size**, so `2em` at an 11 px base renders at 22 px — and, when embedded inline, scales with the surrounding text.
 - **Live size readout** — shows the resolved font size and the resulting overall graphic dimensions (which differ, since tall constructs like an integral with limits span well beyond the font size).
@@ -38,6 +39,10 @@ Alternatively try the always up-to-date [app on GitHub Pages](https://607011.git
 ### Recognize a formula from an image
 
 Drop an image onto the intake zone below the formula field, paste one from the clipboard (Ctrl/Cmd+V), or click to pick a file. The formula is recognized into LaTeX and rendered right away. Recognition runs fully in the browser; on first use it downloads the ~80 MB model from the Hugging Face CDN (cached afterwards). It works best on clearly printed formulas — always double-check the result.
+
+### Paste a formula from MathML
+
+Copy a formula as MathML — e.g. via Word/LibreOffice Math's "Copy" or a browser's "Copy As → MathML" on a MathJax-rendered page — and paste it anywhere in the page (Ctrl/Cmd+V). Formulator detects the `<math>` markup and fills the formula field with the resulting LaTeX. No OCR, no network request — it's a direct, deterministic conversion.
 
 ## Dark mode notes
 
