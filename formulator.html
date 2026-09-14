@@ -478,11 +478,11 @@
         <div class="option">
           <label for="marginafter" data-i18n="label_marginafter">Abstand nach unten</label>
           <div class="size-row">
-            <input type="number" id="marginafter" value="0" min="0" step="0.1" data-i18n-title="marginafter_title"
+            <input type="number" id="marginafter" value="18" min="0" step="0.1" data-i18n-title="marginafter_title"
               title="Fügt unterhalb der Formel zusätzlichen Leerraum im exportierten SVG ein.">
             <select id="marginafterunit">
-              <option value="mm" selected>mm</option>
-              <option value="pt">pt</option>
+              <option value="mm">mm</option>
+              <option value="pt" selected>pt</option>
             </select>
           </div>
         </div>
@@ -1092,7 +1092,31 @@
 
     noXmlDeclEl.addEventListener('change', () => setStatus(''));
 
-    [marginAfterEl, marginAfterUnitEl].forEach(el => el.addEventListener('input', () => setStatus('')));
+    // Persist the "Abstand nach unten" field across sessions (localStorage), since it's a
+    // per-user export preference rather than something tied to a specific formula.
+    const MARGIN_AFTER_STORAGE_KEY = 'formulator.marginafter';
+    const MARGIN_AFTER_UNIT_STORAGE_KEY = 'formulator.marginafterunit';
+
+    function restoreMarginAfter() {
+      try {
+        const value = localStorage.getItem(MARGIN_AFTER_STORAGE_KEY);
+        const unit = localStorage.getItem(MARGIN_AFTER_UNIT_STORAGE_KEY);
+        if (value !== null) marginAfterEl.value = value;
+        if (unit === 'mm' || unit === 'pt') marginAfterUnitEl.value = unit;
+      } catch (e) { /* localStorage unavailable (e.g. private mode) — keep the default */ }
+    }
+
+    function saveMarginAfter() {
+      try {
+        localStorage.setItem(MARGIN_AFTER_STORAGE_KEY, marginAfterEl.value);
+        localStorage.setItem(MARGIN_AFTER_UNIT_STORAGE_KEY, marginAfterUnitEl.value);
+      } catch (e) { /* localStorage unavailable — setting just won't persist */ }
+    }
+
+    [marginAfterEl, marginAfterUnitEl].forEach(el => el.addEventListener('input', () => {
+      saveMarginAfter();
+      setStatus('');
+    }));
 
     a11yToggleEl.addEventListener('change', () => {
       updateSpeechReadout();
@@ -1137,6 +1161,10 @@
       applySpeechLocale();
       render();
     });
+
+    // Restore the last-used "Abstand nach unten" value (falls back to the markup default,
+    // 17pt, when nothing was saved yet).
+    restoreMarginAfter();
 
     // Apply all translations once for the initial language (also sets the "(recommended)"
     // suffix and the live readouts).
