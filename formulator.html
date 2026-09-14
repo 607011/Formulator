@@ -475,6 +475,17 @@
           <input type="checkbox" id="a11ytoggle" checked>
           <label for="a11ytoggle" data-i18n="label_a11y">Vorlesetext für Screenreader einbetten</label>
         </div>
+        <div class="option">
+          <label for="marginafter" data-i18n="label_marginafter">Abstand nach unten</label>
+          <div class="size-row">
+            <input type="number" id="marginafter" value="0" min="0" step="0.1" data-i18n-title="marginafter_title"
+              title="Fügt unterhalb der Formel zusätzlichen Leerraum im exportierten SVG ein.">
+            <select id="marginafterunit">
+              <option value="mm" selected>mm</option>
+              <option value="pt">pt</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       <p class="hint" id="darkmodeHint" data-i18n-html="hint_darkmode" hidden>
@@ -551,6 +562,8 @@
     const dimsReadoutEl = document.getElementById('dimsReadout');
     const speechReadoutEl = document.getElementById('speechReadout');
     const a11yToggleEl = document.getElementById('a11ytoggle');
+    const marginAfterEl = document.getElementById('marginafter');
+    const marginAfterUnitEl = document.getElementById('marginafterunit');
     const errorEl = document.getElementById('error');
     const statusEl = document.getElementById('status');
     const downloadBtn = document.getElementById('downloadBtn');
@@ -594,6 +607,8 @@
         label_darkcolor: 'Farbe (Dark Mode)',
         label_darkmode: 'Dark-Mode-fähig exportieren',
         label_a11y: 'Vorlesetext für Screenreader einbetten',
+        label_marginafter: 'Abstand nach unten',
+        marginafter_title: 'Fügt unterhalb der Formel zusätzlichen Leerraum im exportierten SVG ein.',
         hint_darkmode: 'Das SVG passt sich per <code>prefers-color-scheme</code> automatisch der Systemeinstellung an. Hintergrund bleibt dafür transparent. Bei Websites mit manuellem Dark-Mode-Schalter (statt Systemvorgabe) muss das SVG inline ins HTML eingebettet werden, nicht per &lt;img&gt;.',
         hint_relativesize: '<code>width</code>/<code>height</code> werden relativ zur <em>Standardschriftgröße</em> geschrieben, statt in festen Pixeln. Ist das SVG-Markup direkt (inline) in eine Seite eingebettet, deren (Root-)Schriftgröße dieser Standardschriftgröße entspricht, erscheint die Formel genau so groß wie hier in der Vorschau und skaliert mit der Textgröße. Bei Einbindung per <code>&lt;img src="..."&gt;</code> greift das nicht &ndash; dort stattdessen im Stylesheet der Seite z.&nbsp;B. <code>img.formula { height: 1.1em; width: auto; }</code> setzen.',
         hint_rem: 'Achtung: Firefox unterstützt <code>rem</code> als <code>width</code>/<code>height</code>-Einheit bei SVGs bislang nicht zuverlässig (Chrome, Safari und Edge schon). Für garantierte Kompatibilität <code>em</code> oder <code>px</code> verwenden.',
@@ -649,6 +664,8 @@
         label_darkcolor: 'Color (dark mode)',
         label_darkmode: 'Export dark-mode aware',
         label_a11y: 'Embed spoken text for screen readers',
+        label_marginafter: 'Space after',
+        marginafter_title: 'Adds extra whitespace below the formula in the exported SVG.',
         hint_darkmode: 'The SVG adapts to the system setting automatically via <code>prefers-color-scheme</code>; the background stays transparent for that. On sites with a manual dark-mode toggle (rather than the system setting), the SVG must be embedded inline in the HTML, not via &lt;img&gt;.',
         hint_relativesize: '<code>width</code>/<code>height</code> are written relative to the <em>base font size</em> instead of fixed pixels. When the SVG markup is embedded directly (inline) in a page whose (root) font size equals this base font size, the formula appears exactly as large as in the preview here and scales with the text size. When embedding via <code>&lt;img src="..."&gt;</code> this has no effect &ndash; there, set e.g. <code>img.formula { height: 1.1em; width: auto; }</code> in the page stylesheet instead.',
         hint_rem: 'Note: Firefox does not reliably support <code>rem</code> as a <code>width</code>/<code>height</code> unit for SVGs yet (Chrome, Safari and Edge do). For guaranteed compatibility use <code>em</code> or <code>px</code>.',
@@ -880,11 +897,26 @@
       basesizeEl.disabled = !rel;
     }
 
+    // Extra whitespace added below the formula in the exported SVG, resolved from the
+    // "Abstand nach unten" field (given in mm or pt, at the CSS-standard 96dpi reference)
+    // to px, independent of the chosen export unit.
+    function currentMarginAfterPx() {
+      const v = parseFloat(marginAfterEl.value) || 0;
+      if (v <= 0) return 0;
+      return marginAfterUnitEl.value === 'mm' ? v * 96 / 25.4 : v * 96 / 72;
+    }
+
     function buildExportSvg() {
       if (!currentSvg)
         return null;
       const clone = currentSvg.cloneNode(true);
       const rect = currentSvg.getBoundingClientRect();
+
+      // Extra whitespace below the formula, folded into the exported height only (the
+      // on-screen preview is unaffected). Content stays anchored at the top; the viewBox
+      // is extended downward further below, once its original numbers are still at hand.
+      const marginPx = currentMarginAfterPx();
+      const exportHeight = rect.height + marginPx;
 
       switch (exportUnitEl.value) {
         case 'em':
@@ -900,7 +932,7 @@
           const basePx = currentBasePx();
           const unit = exportUnitEl.value;
           clone.setAttribute('width', `${trimNum(rect.width / basePx)}${unit}`);
-          clone.setAttribute('height', `${trimNum(rect.height / basePx)}${unit}`);
+          clone.setAttribute('height', `${trimNum(exportHeight / basePx)}${unit}`);
           break;
         }
         case 'pt':
@@ -908,12 +940,25 @@
           // CSS reference). Mainly useful for importing into print/design tools (e.g.
           // Affinity Designer) that work in points rather than pixels.
           clone.setAttribute('width', `${trimNum(rect.width * 0.75)}pt`);
-          clone.setAttribute('height', `${trimNum(rect.height * 0.75)}pt`);
+          clone.setAttribute('height', `${trimNum(exportHeight * 0.75)}pt`);
           break;
         default:
           clone.setAttribute('width', rect.width.toFixed(2));
-          clone.setAttribute('height', rect.height.toFixed(2));
+          clone.setAttribute('height', exportHeight.toFixed(2));
           break;
+      }
+
+      // Grow the viewBox by the same margin, in the SVG's own coordinate system (MathJax
+      // scales its internal units to the rendered px size, so the ratio between the two is
+      // constant). Only the height grows, and only downward (minY/width untouched), which
+      // leaves the formula itself pinned to the top and adds plain whitespace below it.
+      if (marginPx > 0) {
+        const viewBoxParts = (clone.getAttribute('viewBox') || '').trim().split(/\s+/).map(Number);
+        if (viewBoxParts.length === 4 && rect.height > 0) {
+          const [minX, minY, vbWidth, vbHeight] = viewBoxParts;
+          const scale = vbHeight / rect.height; // viewBox units per rendered px
+          clone.setAttribute('viewBox', `${minX} ${minY} ${vbWidth} ${trimNum(vbHeight + marginPx * scale)}`);
+        }
       }
       // MathJax itself already stamps plain "xmlns" and "xmlns:xlink" attributes onto
       // the root <svg> (see output/svg.ts). Those are ordinary attributes, not real
@@ -1046,6 +1091,8 @@
     });
 
     noXmlDeclEl.addEventListener('change', () => setStatus(''));
+
+    [marginAfterEl, marginAfterUnitEl].forEach(el => el.addEventListener('input', () => setStatus('')));
 
     a11yToggleEl.addEventListener('change', () => {
       updateSpeechReadout();
