@@ -528,8 +528,15 @@
         <input type="checkbox" id="noxmldecl" checked>
         <label for="noxmldecl" data-i18n="label_noxml">Keine XML-Deklaration voranstellen</label>
       </div>
+      <div class="option inline" style="margin-top: 6px;">
+        <label for="pngscale" data-i18n="label_pngscale">PNG-Skalierung</label>
+        <input type="number" id="pngscale" value="3" min="1" max="8" step="0.5" style="width: 4.5em;"
+          data-i18n-title="pngscale_title"
+          title="Faktor für die Auflösung des PNG-Exports (bezogen auf die Formel-Schriftgröße in px). Höher = schärfer, aber größere Datei.">
+      </div>
       <div class="actions">
         <button class="primary" id="downloadBtn" data-i18n="btn_download">SVG herunterladen</button>
+        <button class="primary" id="downloadPngBtn" data-i18n="btn_download_png">PNG herunterladen</button>
         <button class="secondary" id="copyBtn" data-i18n="btn_copy">SVG-Code kopieren</button>
       </div>
       <div class="status" id="status"></div>
@@ -567,6 +574,8 @@
     const errorEl = document.getElementById('error');
     const statusEl = document.getElementById('status');
     const downloadBtn = document.getElementById('downloadBtn');
+    const downloadPngBtn = document.getElementById('downloadPngBtn');
+    const pngScaleEl = document.getElementById('pngscale');
     const copyBtn = document.getElementById('copyBtn');
     const ocrZoneEl = document.getElementById('ocrZone');
     const ocrFileEl = document.getElementById('ocrFile');
@@ -616,18 +625,23 @@
         toggle_light: 'Hell',
         toggle_dark: 'Dunkel',
         label_noxml: 'Keine XML-Deklaration voranstellen',
+        label_pngscale: 'PNG-Skalierung',
+        pngscale_title: 'Faktor für die Auflösung des PNG-Exports (bezogen auf die Formel-Schriftgröße in px). Höher = schärfer, aber größere Datei.',
         btn_download: 'SVG herunterladen',
+        btn_download_png: 'PNG herunterladen',
         btn_copy: 'SVG-Code kopieren',
         footer: 'Rendering via MathJax (SVG-Ausgabe) — läuft vollständig im Browser, keine Server-Anfrage nötig. <a href="https://docs.mathjax.org/en/latest/input/tex/macros/index.html" target="_blank" rel="noopener noreferrer">MathJax-Referenz</a>',
         err_empty: 'Bitte eine Formel eingeben.',
         err_mathjax_loading: 'MathJax wird noch geladen …',
         err_no_svg: 'Kein SVG erzeugt.',
         err_render: 'Fehler beim Rendern: {msg}',
+        err_png_render: 'PNG-Export fehlgeschlagen.',
         dims_readout: 'Schriftgröße: {font} px · Grafik: {w} × {h} px',
         speech_off: 'Vorlesetext deaktiviert.',
         speech_text: '🔊 Vorlesetext: „{speech}“',
         speech_generating: 'Vorlesetext wird erzeugt … (a11y-Komponente lädt evtl. noch — erneut tippen)',
         status_downloaded: 'SVG heruntergeladen.',
+        status_downloaded_png: 'PNG heruntergeladen.',
         status_copied: 'SVG-Code in Zwischenablage kopiert.',
         status_copy_failed: 'Kopieren fehlgeschlagen — Zwischenablage nicht verfügbar.',
         ocr_model_loading: 'Modell wird geladen … {file} {pct}%',
@@ -673,18 +687,23 @@
         toggle_light: 'Light',
         toggle_dark: 'Dark',
         label_noxml: 'Omit the XML declaration',
+        label_pngscale: 'PNG scale',
+        pngscale_title: 'Resolution factor for the PNG export (relative to the formula font size in px). Higher = sharper, but a larger file.',
         btn_download: 'Download SVG',
+        btn_download_png: 'Download PNG',
         btn_copy: 'Copy SVG code',
         footer: 'Rendering via MathJax (SVG output) — runs entirely in the browser, no server request needed. <a href="https://docs.mathjax.org/en/latest/input/tex/macros/index.html" target="_blank" rel="noopener noreferrer">MathJax reference</a>',
         err_empty: 'Please enter a formula.',
         err_mathjax_loading: 'MathJax is still loading …',
         err_no_svg: 'No SVG produced.',
         err_render: 'Rendering error: {msg}',
+        err_png_render: 'PNG export failed.',
         dims_readout: 'Font size: {font} px · Graphic: {w} × {h} px',
         speech_off: 'Spoken text disabled.',
         speech_text: '🔊 Spoken text: “{speech}”',
         speech_generating: 'Generating spoken text … (a11y component may still be loading — type again)',
         status_downloaded: 'SVG downloaded.',
+        status_downloaded_png: 'PNG downloaded.',
         status_copied: 'SVG code copied to clipboard.',
         status_copy_failed: 'Copy failed — clipboard not available.',
         ocr_model_loading: 'Loading model … {file} {pct}%',
@@ -819,6 +838,7 @@
     async function render() {
       const input = formulaEl.value.trim();
       downloadBtn.disabled = true;
+      downloadPngBtn.disabled = true;
       copyBtn.disabled = true;
       currentSvg = null;
       currentSpeech = '';
@@ -854,6 +874,7 @@
         setError(null);
         setStatus('');
         downloadBtn.disabled = false;
+        downloadPngBtn.disabled = false;
         copyBtn.disabled = false;
       } catch (err) {
         previewEl.innerHTML = '';
@@ -906,6 +927,17 @@
       return marginAfterUnitEl.value === 'mm' ? v * 96 / 25.4 : v * 96 / 72;
     }
 
+    // Resolves the export SVG's target pixel size (rendered size plus the "Abstand nach
+    // unten" margin), independent of which unit (em/rem/px/pt) the exported width/height
+    // attributes end up using. Shared by buildExportSvg() (for the unit conversions below)
+    // and the PNG rasterizer, which needs plain px to size its canvas.
+    function currentExportPixelSize() {
+      if (!currentSvg)
+        return null;
+      const rect = currentSvg.getBoundingClientRect();
+      return { width: rect.width, height: rect.height + currentMarginAfterPx() };
+    }
+
     function buildExportSvg() {
       if (!currentSvg)
         return null;
@@ -916,7 +948,7 @@
       // on-screen preview is unaffected). Content stays anchored at the top; the viewBox
       // is extended downward further below, once its original numbers are still at hand.
       const marginPx = currentMarginAfterPx();
-      const exportHeight = rect.height + marginPx;
+      const exportHeight = currentExportPixelSize().height;
 
       switch (exportUnitEl.value) {
         case 'em':
@@ -1035,6 +1067,57 @@
       return `<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n${source}`;
     }
 
+    // Prepares the export SVG for rasterization. PNG is a static image and can't react to
+    // prefers-color-scheme the way the dark-mode-aware SVG file does, so when that mode is
+    // on, swap its <style> media query for a fixed color — whichever the preview toggle
+    // (Hell/Dunkel) currently shows — instead of leaving the color choice to whatever theme
+    // the browser happens to render the offscreen <img> in.
+    function buildPngSvg() {
+      const svg = buildExportSvg();
+      if (!svg)
+        return null;
+      if (darkmodeEl.checked) {
+        const styleEl = svg.querySelector(':scope > style');
+        if (styleEl) styleEl.remove();
+        svg.classList.remove('formulator-formula');
+        svg.style.color = previewMode === 'dark' ? darkcolorEl.value : colorEl.value;
+      }
+      return svg;
+    }
+
+    // Rasterizes an SVG element to a PNG blob at widthPx×heightPx * scale, by loading it as
+    // an <img> (so the browser's own SVG renderer draws it, fonts/paths and all) and
+    // painting that onto a canvas of the target size.
+    async function svgToPngBlob(svgEl, widthPx, heightPx, scale) {
+      const rasterSvg = svgEl.cloneNode(true);
+      // Absolute px, regardless of the chosen export unit (em/rem/pt) — otherwise the
+      // <img> would resolve em/rem against its own font size, not the formula's, and come
+      // out at the wrong pixel size.
+      rasterSvg.setAttribute('width', String(widthPx));
+      rasterSvg.setAttribute('height', String(heightPx));
+      const source = new XMLSerializer().serializeToString(rasterSvg);
+      const svgUrl = URL.createObjectURL(new Blob([source], { type: 'image/svg+xml;charset=utf-8' }));
+      try {
+        const img = new Image();
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = () => reject(new Error(t('err_png_render')));
+          img.src = svgUrl;
+        });
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(widthPx * scale));
+        canvas.height = Math.max(1, Math.round(heightPx * scale));
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        if (!blob)
+          throw new Error(t('err_png_render'));
+        return blob;
+      } finally {
+        URL.revokeObjectURL(svgUrl);
+      }
+    }
+
     downloadBtn.addEventListener('click', () => {
       const exportSvg = buildExportSvg();
       if (!exportSvg)
@@ -1050,6 +1133,31 @@
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       setStatus(t('status_downloaded'));
+    });
+
+    downloadPngBtn.addEventListener('click', async () => {
+      const pngSvg = buildPngSvg();
+      const pxSize = currentExportPixelSize();
+      if (!pngSvg || !pxSize)
+        return;
+      const scale = Math.max(1, parseFloat(pngScaleEl.value) || 1);
+      downloadPngBtn.disabled = true;
+      try {
+        const blob = await svgToPngBlob(pngSvg, pxSize.width, pxSize.height, scale);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'formel.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        setStatus(t('status_downloaded_png'));
+      } catch (err) {
+        setStatus(t('err_png_render'));
+      } finally {
+        downloadPngBtn.disabled = false;
+      }
     });
 
     copyBtn.addEventListener('click', async () => {
