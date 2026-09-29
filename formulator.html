@@ -35,6 +35,11 @@
   </script>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" id="mathjax-script" defer></script>
+  <!-- PDF export: jsPDF builds the document, svg2pdf.js (loaded after it, so it can patch
+       jsPDF.API.svg) draws the formula's SVG into it as real vector paths/text rather than
+       a raster image — keeps the PDF crisp at any zoom/print size. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js" id="jspdf-script" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/svg2pdf.js@2.2.4/dist/svg2pdf.umd.min.js" id="svg2pdf-script" defer></script>
   <style>
     :root {
       --bg: #f7f7f8;
@@ -537,6 +542,7 @@
       <div class="actions">
         <button class="primary" id="downloadBtn" data-i18n="btn_download">SVG herunterladen</button>
         <button class="primary" id="downloadPngBtn" data-i18n="btn_download_png">PNG herunterladen</button>
+        <button class="primary" id="downloadPdfBtn" data-i18n="btn_download_pdf">PDF herunterladen</button>
         <button class="secondary" id="copyBtn" data-i18n="btn_copy">SVG-Code kopieren</button>
       </div>
       <div class="status" id="status"></div>
@@ -576,6 +582,7 @@
     const downloadBtn = document.getElementById('downloadBtn');
     const downloadPngBtn = document.getElementById('downloadPngBtn');
     const pngScaleEl = document.getElementById('pngscale');
+    const downloadPdfBtn = document.getElementById('downloadPdfBtn');
     const copyBtn = document.getElementById('copyBtn');
     const ocrZoneEl = document.getElementById('ocrZone');
     const ocrFileEl = document.getElementById('ocrFile');
@@ -629,6 +636,7 @@
         pngscale_title: 'Faktor für die Auflösung des PNG-Exports (bezogen auf die Formel-Schriftgröße in px). Höher = schärfer, aber größere Datei.',
         btn_download: 'SVG herunterladen',
         btn_download_png: 'PNG herunterladen',
+        btn_download_pdf: 'PDF herunterladen',
         btn_copy: 'SVG-Code kopieren',
         footer: 'Rendering via MathJax (SVG-Ausgabe) — läuft vollständig im Browser, keine Server-Anfrage nötig. <a href="https://docs.mathjax.org/en/latest/input/tex/macros/index.html" target="_blank" rel="noopener noreferrer">MathJax-Referenz</a>',
         err_empty: 'Bitte eine Formel eingeben.',
@@ -636,12 +644,15 @@
         err_no_svg: 'Kein SVG erzeugt.',
         err_render: 'Fehler beim Rendern: {msg}',
         err_png_render: 'PNG-Export fehlgeschlagen.',
+        err_pdf_render: 'PDF-Export fehlgeschlagen.',
+        err_pdf_loading: 'PDF-Bibliothek wird noch geladen … gleich nochmal versuchen.',
         dims_readout: 'Schriftgröße: {font} px · Grafik: {w} × {h} px',
         speech_off: 'Vorlesetext deaktiviert.',
         speech_text: '🔊 Vorlesetext: „{speech}“',
         speech_generating: 'Vorlesetext wird erzeugt … (a11y-Komponente lädt evtl. noch — erneut tippen)',
         status_downloaded: 'SVG heruntergeladen.',
         status_downloaded_png: 'PNG heruntergeladen.',
+        status_downloaded_pdf: 'PDF heruntergeladen.',
         status_copied: 'SVG-Code in Zwischenablage kopiert.',
         status_copy_failed: 'Kopieren fehlgeschlagen — Zwischenablage nicht verfügbar.',
         ocr_model_loading: 'Modell wird geladen … {file} {pct}%',
@@ -691,6 +702,7 @@
         pngscale_title: 'Resolution factor for the PNG export (relative to the formula font size in px). Higher = sharper, but a larger file.',
         btn_download: 'Download SVG',
         btn_download_png: 'Download PNG',
+        btn_download_pdf: 'Download PDF',
         btn_copy: 'Copy SVG code',
         footer: 'Rendering via MathJax (SVG output) — runs entirely in the browser, no server request needed. <a href="https://docs.mathjax.org/en/latest/input/tex/macros/index.html" target="_blank" rel="noopener noreferrer">MathJax reference</a>',
         err_empty: 'Please enter a formula.',
@@ -698,12 +710,15 @@
         err_no_svg: 'No SVG produced.',
         err_render: 'Rendering error: {msg}',
         err_png_render: 'PNG export failed.',
+        err_pdf_render: 'PDF export failed.',
+        err_pdf_loading: 'The PDF library is still loading … try again in a moment.',
         dims_readout: 'Font size: {font} px · Graphic: {w} × {h} px',
         speech_off: 'Spoken text disabled.',
         speech_text: '🔊 Spoken text: “{speech}”',
         speech_generating: 'Generating spoken text … (a11y component may still be loading — type again)',
         status_downloaded: 'SVG downloaded.',
         status_downloaded_png: 'PNG downloaded.',
+        status_downloaded_pdf: 'PDF downloaded.',
         status_copied: 'SVG code copied to clipboard.',
         status_copy_failed: 'Copy failed — clipboard not available.',
         ocr_model_loading: 'Loading model … {file} {pct}%',
@@ -839,6 +854,7 @@
       const input = formulaEl.value.trim();
       downloadBtn.disabled = true;
       downloadPngBtn.disabled = true;
+      downloadPdfBtn.disabled = true;
       copyBtn.disabled = true;
       currentSvg = null;
       currentSpeech = '';
@@ -875,6 +891,7 @@
         setStatus('');
         downloadBtn.disabled = false;
         downloadPngBtn.disabled = false;
+        downloadPdfBtn.disabled = false;
         copyBtn.disabled = false;
       } catch (err) {
         previewEl.innerHTML = '';
@@ -1067,12 +1084,12 @@
       return `<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n${source}`;
     }
 
-    // Prepares the export SVG for rasterization. PNG is a static image and can't react to
-    // prefers-color-scheme the way the dark-mode-aware SVG file does, so when that mode is
-    // on, swap its <style> media query for a fixed color — whichever the preview toggle
-    // (Hell/Dunkel) currently shows — instead of leaving the color choice to whatever theme
-    // the browser happens to render the offscreen <img> in.
-    function buildPngSvg() {
+    // Prepares the export SVG for PNG/PDF output. Both are static — unlike the SVG file,
+    // neither can react to prefers-color-scheme — so when dark mode is on, swap its <style>
+    // media query for a fixed color — whichever the preview toggle (Hell/Dunkel) currently
+    // shows — instead of leaving the color choice to whatever theme the renderer happens to
+    // pick (the offscreen <img> for PNG, or nothing at all for the PDF vector path).
+    function buildStaticExportSvg() {
       const svg = buildExportSvg();
       if (!svg)
         return null;
@@ -1118,6 +1135,31 @@
       }
     }
 
+    // Whether jsPDF + svg2pdf.js have finished loading. Both are loaded with `defer`, same
+    // as MathJax, so they may not have executed yet at any given point in time.
+    function pdfLibsReady() {
+      return !!(window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API.svg);
+    }
+
+    // Builds a one-page PDF, sized to exactly fit the formula (plus the "Abstand nach
+    // unten" margin), with the SVG drawn into it as real vector paths/text via svg2pdf.js
+    // rather than a raster embed — stays crisp at any zoom or print size.
+    async function svgToPdfBlob(svgEl, widthPx, heightPx) {
+      const { jsPDF } = window.jspdf;
+      // pt (1px = 0.75pt at the standard 96dpi CSS reference) matches the "pt" choice
+      // already offered for the SVG export unit, and is jsPDF's native unit.
+      const widthPt = widthPx * 0.75;
+      const heightPt = heightPx * 0.75;
+      // jsPDF's default orientation is portrait, which it enforces by swapping a wider-
+      // than-tall format array around — exactly the shape most formulas have — cropping
+      // the drawn SVG against the now-undersized width. Pick the orientation that already
+      // matches so the page keeps the formula's actual aspect ratio.
+      const orientation = widthPt >= heightPt ? 'l' : 'p';
+      const pdf = new jsPDF({ orientation, unit: 'pt', format: [widthPt, heightPt] });
+      await pdf.svg(svgEl, { x: 0, y: 0, width: widthPt, height: heightPt });
+      return pdf.output('blob');
+    }
+
     downloadBtn.addEventListener('click', () => {
       const exportSvg = buildExportSvg();
       if (!exportSvg)
@@ -1136,7 +1178,7 @@
     });
 
     downloadPngBtn.addEventListener('click', async () => {
-      const pngSvg = buildPngSvg();
+      const pngSvg = buildStaticExportSvg();
       const pxSize = currentExportPixelSize();
       if (!pngSvg || !pxSize)
         return;
@@ -1157,6 +1199,34 @@
         setStatus(t('err_png_render'));
       } finally {
         downloadPngBtn.disabled = false;
+      }
+    });
+
+    downloadPdfBtn.addEventListener('click', async () => {
+      const pdfSvg = buildStaticExportSvg();
+      const pxSize = currentExportPixelSize();
+      if (!pdfSvg || !pxSize)
+        return;
+      if (!pdfLibsReady()) {
+        setStatus(t('err_pdf_loading'));
+        return;
+      }
+      downloadPdfBtn.disabled = true;
+      try {
+        const blob = await svgToPdfBlob(pdfSvg, pxSize.width, pxSize.height);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'formel.pdf';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        setStatus(t('status_downloaded_pdf'));
+      } catch (err) {
+        setStatus(t('err_pdf_render'));
+      } finally {
+        downloadPdfBtn.disabled = false;
       }
     });
 
