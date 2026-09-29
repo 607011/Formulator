@@ -34,12 +34,14 @@
     };
   </script>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" id="mathjax-script" defer></script>
-  <!-- PDF export: jsPDF builds the document, svg2pdf.js (loaded after it, so it can patch
-       jsPDF.API.svg) draws the formula's SVG into it as real vector paths/text rather than
-       a raster image — keeps the PDF crisp at any zoom/print size. -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js" id="jspdf-script" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/svg2pdf.js@2.2.4/dist/svg2pdf.umd.min.js" id="svg2pdf-script" defer></script>
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <!-- Version pinned (rather than the "@3" range used before) so the file's bytes — and
+       therefore this hash — stay stable; bump both together when upgrading. -->
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js" id="mathjax-script" defer
+    integrity="sha384-KKWa9jJ1MZvssLeOoXG6FiOAZfAgmzsIIfw8BXwI9+kYm0lPCbC6yTQPBC00F1/L" crossorigin="anonymous"></script>
+  <!-- PDF export (jsPDF + svg2pdf.js) is loaded lazily, on the first click of "PDF
+       herunterladen" — see loadPdfLibs() — rather than upfront here, since most visits
+       never touch it. -->
   <style>
     :root {
       --bg: #f7f7f8;
@@ -539,6 +541,12 @@
           data-i18n-title="pngscale_title"
           title="Faktor für die Auflösung des PNG-Exports (bezogen auf die Formel-Schriftgröße in px). Höher = schärfer, aber größere Datei.">
       </div>
+      <div class="option inline" style="margin-top: 6px;">
+        <label for="filename" data-i18n="label_filename">Dateiname</label>
+        <input type="text" id="filename" placeholder="formel" data-i18n-placeholder="filename_placeholder"
+          style="width: 12em;" data-i18n-title="filename_title"
+          title="Name der heruntergeladenen Datei (ohne Endung) – die Endung (.svg/.png/.pdf) wird automatisch angehängt.">
+      </div>
       <div class="actions">
         <button class="primary" id="downloadBtn" data-i18n="btn_download">SVG herunterladen</button>
         <button class="primary" id="downloadPngBtn" data-i18n="btn_download_png">PNG herunterladen</button>
@@ -582,6 +590,7 @@
     const downloadBtn = document.getElementById('downloadBtn');
     const downloadPngBtn = document.getElementById('downloadPngBtn');
     const pngScaleEl = document.getElementById('pngscale');
+    const filenameEl = document.getElementById('filename');
     const downloadPdfBtn = document.getElementById('downloadPdfBtn');
     const copyBtn = document.getElementById('copyBtn');
     const ocrZoneEl = document.getElementById('ocrZone');
@@ -632,6 +641,9 @@
         toggle_light: 'Hell',
         toggle_dark: 'Dunkel',
         label_noxml: 'Keine XML-Deklaration voranstellen',
+        label_filename: 'Dateiname',
+        filename_placeholder: 'formel',
+        filename_title: 'Name der heruntergeladenen Datei (ohne Endung) – die Endung (.svg/.png/.pdf) wird automatisch angehängt.',
         label_pngscale: 'PNG-Skalierung',
         pngscale_title: 'Faktor für die Auflösung des PNG-Exports (bezogen auf die Formel-Schriftgröße in px). Höher = schärfer, aber größere Datei.',
         btn_download: 'SVG herunterladen',
@@ -645,7 +657,7 @@
         err_render: 'Fehler beim Rendern: {msg}',
         err_png_render: 'PNG-Export fehlgeschlagen.',
         err_pdf_render: 'PDF-Export fehlgeschlagen.',
-        err_pdf_loading: 'PDF-Bibliothek wird noch geladen … gleich nochmal versuchen.',
+        status_pdf_loading: 'PDF-Bibliothek wird geladen …',
         dims_readout: 'Schriftgröße: {font} px · Grafik: {w} × {h} px',
         speech_off: 'Vorlesetext deaktiviert.',
         speech_text: '🔊 Vorlesetext: „{speech}“',
@@ -698,6 +710,9 @@
         toggle_light: 'Light',
         toggle_dark: 'Dark',
         label_noxml: 'Omit the XML declaration',
+        label_filename: 'File name',
+        filename_placeholder: 'formel',
+        filename_title: 'Name of the downloaded file (without extension) – the extension (.svg/.png/.pdf) is appended automatically.',
         label_pngscale: 'PNG scale',
         pngscale_title: 'Resolution factor for the PNG export (relative to the formula font size in px). Higher = sharper, but a larger file.',
         btn_download: 'Download SVG',
@@ -711,7 +726,7 @@
         err_render: 'Rendering error: {msg}',
         err_png_render: 'PNG export failed.',
         err_pdf_render: 'PDF export failed.',
-        err_pdf_loading: 'The PDF library is still loading … try again in a moment.',
+        status_pdf_loading: 'Loading the PDF library …',
         dims_readout: 'Font size: {font} px · Graphic: {w} × {h} px',
         speech_off: 'Spoken text disabled.',
         speech_text: '🔊 Spoken text: “{speech}”',
@@ -748,6 +763,7 @@
       document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
       document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
       document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); });
       // The "(recommended)" suffix on the display-mode option depends on the platform.
       if (!isWindows()) displayOptionEl.textContent += t('recommended_suffix');
     }
@@ -906,6 +922,16 @@
 
     function trimNum(n) {
       return n.toFixed(4).replace(/\.?0+$/, '');
+    }
+
+    // Base name (without extension) for downloaded files, taken from the "Dateiname" field.
+    // Falls back to "formel" when empty, and strips characters that are invalid (or awkward)
+    // in file names on common filesystems, since the field otherwise accepts free text.
+    function currentFilenameBase() {
+      const raw = filenameEl.value.trim();
+      if (!raw)
+        return 'formel';
+      return raw.replace(/[\\/:*?"<>|]+/g, '_');
     }
 
     // Base font size (in px) that em/rem are measured against — e.g. the target page's
@@ -1135,10 +1161,39 @@
       }
     }
 
-    // Whether jsPDF + svg2pdf.js have finished loading. Both are loaded with `defer`, same
-    // as MathJax, so they may not have executed yet at any given point in time.
-    function pdfLibsReady() {
-      return !!(window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API.svg);
+    // Injects a <script> tag and resolves once it has loaded (or rejects on network/
+    // integrity failure). SRI (integrity + crossorigin) applies here the same way it does
+    // to the static <script> tags in <head> — pinned exact versions so the hash stays valid.
+    function loadScript(src, integrity) {
+      return new Promise((resolve, reject) => {
+        const el = document.createElement('script');
+        el.src = src;
+        el.integrity = integrity;
+        el.crossOrigin = 'anonymous';
+        el.onload = () => resolve();
+        el.onerror = () => reject(new Error(`Failed to load ${src}`));
+        document.head.appendChild(el);
+      });
+    }
+
+    // Lazily loads jsPDF + svg2pdf.js on first use (most visits never touch the PDF export),
+    // caching the in-flight/completed load so repeat clicks don't re-fetch or re-inject the
+    // scripts. svg2pdf.js must load after jsPDF, since it patches jsPDF.API.svg onto it.
+    let pdfLibsPromise = null;
+    function loadPdfLibs() {
+      if (!pdfLibsPromise) {
+        pdfLibsPromise = loadScript(
+          'https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js',
+          'sha384-qovJwSBbRDPP5cEjCp8S0UP66wrvnjaa60XMOGzTNanrThcrGfXfnZkvgY8N1KT3'
+        ).then(() => loadScript(
+          'https://cdn.jsdelivr.net/npm/svg2pdf.js@2.2.4/dist/svg2pdf.umd.min.js',
+          'sha384-HoxAKaOOcVifYbcey45SDVl9ja1q3b04qwykef9f6tzQAkkmNNGH3lclNdTquUX9'
+        )).catch(err => {
+          pdfLibsPromise = null; // allow retrying after a failed (e.g. offline) attempt
+          throw err;
+        });
+      }
+      return pdfLibsPromise;
     }
 
     // Builds a one-page PDF, sized to exactly fit the formula (plus the "Abstand nach
@@ -1169,7 +1224,7 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'formel.svg';
+      a.download = `${currentFilenameBase()}.svg`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -1189,7 +1244,7 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'formel.png';
+        a.download = `${currentFilenameBase()}.png`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -1207,17 +1262,17 @@
       const pxSize = currentExportPixelSize();
       if (!pdfSvg || !pxSize)
         return;
-      if (!pdfLibsReady()) {
-        setStatus(t('err_pdf_loading'));
-        return;
-      }
       downloadPdfBtn.disabled = true;
+      // Only shown when the libraries actually still need fetching (cheap on repeat
+      // clicks, since loadPdfLibs() then just returns the already-resolved promise).
+      if (!pdfLibsPromise) setStatus(t('status_pdf_loading'));
       try {
+        await loadPdfLibs();
         const blob = await svgToPdfBlob(pdfSvg, pxSize.width, pxSize.height);
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'formel.pdf';
+        a.download = `${currentFilenameBase()}.pdf`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -1247,15 +1302,18 @@
     [formulaEl, modeEl].forEach(el => el.addEventListener('input', scheduleRender));
     [fontsizeEl, basesizeEl].forEach(el => el.addEventListener('input', () => {
       updatePreviewGeometry();
+      savePersistedSettings();
       setStatus('');
     }));
     [colorEl, bgcolorEl, bgtoggleEl, darkcolorEl].forEach(el => el.addEventListener('input', () => {
       updatePreviewColors();
+      savePersistedSettings();
       setStatus('');
     }));
 
     darkmodeEl.addEventListener('change', () => {
       updateDarkModeUI();
+      savePersistedSettings(); // updateDarkModeUI() may have just forced bgtoggle off
       setStatus('');
     });
 
@@ -1265,34 +1323,51 @@
       remHintEl.hidden = unit !== 'rem';
       updateBaseState();
       updatePreviewGeometry(); // resolved font px depends on the unit
+      savePersistedSettings();
       setStatus('');
     });
 
     noXmlDeclEl.addEventListener('change', () => setStatus(''));
 
-    // Persist the "Abstand nach unten" field across sessions (localStorage), since it's a
-    // per-user export preference rather than something tied to a specific formula.
-    const MARGIN_AFTER_STORAGE_KEY = 'formulator.marginafter';
-    const MARGIN_AFTER_UNIT_STORAGE_KEY = 'formulator.marginafterunit';
+    // Persist export/display preferences across sessions (localStorage) — the LaTeX input
+    // itself is deliberately excluded, since that's per-formula, not a standing preference.
+    // Each entry's `el.id` becomes its storage key (prefixed); `checked` fields store '1'/'0',
+    // everything else stores `.value` as-is.
+    const SETTINGS_STORAGE_PREFIX = 'formulator.';
+    const PERSISTED_FIELDS = [
+      { el: colorEl, kind: 'value' },
+      { el: bgcolorEl, kind: 'value' },
+      { el: bgtoggleEl, kind: 'checked' },
+      { el: darkcolorEl, kind: 'value' },
+      { el: darkmodeEl, kind: 'checked' },
+      { el: basesizeEl, kind: 'value' },
+      { el: fontsizeEl, kind: 'value' },
+      { el: exportUnitEl, kind: 'value' },
+      { el: marginAfterEl, kind: 'value' },
+      { el: marginAfterUnitEl, kind: 'value' },
+      { el: pngScaleEl, kind: 'value' },
+    ];
 
-    function restoreMarginAfter() {
-      try {
-        const value = localStorage.getItem(MARGIN_AFTER_STORAGE_KEY);
-        const unit = localStorage.getItem(MARGIN_AFTER_UNIT_STORAGE_KEY);
-        if (value !== null) marginAfterEl.value = value;
-        if (unit === 'mm' || unit === 'pt') marginAfterUnitEl.value = unit;
-      } catch (e) { /* localStorage unavailable (e.g. private mode) — keep the default */ }
+    function restorePersistedSettings() {
+      for (const { el, kind } of PERSISTED_FIELDS) {
+        try {
+          const raw = localStorage.getItem(SETTINGS_STORAGE_PREFIX + el.id);
+          if (raw === null) continue;
+          if (kind === 'checked') el.checked = raw === '1';
+          else el.value = raw;
+        } catch (e) { /* localStorage unavailable (e.g. private mode) — keep the default */ }
+      }
     }
 
-    function saveMarginAfter() {
+    function savePersistedSettings() {
       try {
-        localStorage.setItem(MARGIN_AFTER_STORAGE_KEY, marginAfterEl.value);
-        localStorage.setItem(MARGIN_AFTER_UNIT_STORAGE_KEY, marginAfterUnitEl.value);
-      } catch (e) { /* localStorage unavailable — setting just won't persist */ }
+        for (const { el, kind } of PERSISTED_FIELDS)
+          localStorage.setItem(SETTINGS_STORAGE_PREFIX + el.id, kind === 'checked' ? (el.checked ? '1' : '0') : el.value);
+      } catch (e) { /* localStorage unavailable — settings just won't persist */ }
     }
 
-    [marginAfterEl, marginAfterUnitEl].forEach(el => el.addEventListener('input', () => {
-      saveMarginAfter();
+    [marginAfterEl, marginAfterUnitEl, pngScaleEl].forEach(el => el.addEventListener('input', () => {
+      savePersistedSettings();
       setStatus('');
     }));
 
@@ -1340,9 +1415,9 @@
       render();
     });
 
-    // Restore the last-used "Abstand nach unten" value (falls back to the markup default,
-    // 17pt, when nothing was saved yet).
-    restoreMarginAfter();
+    // Restore last-used export/display preferences (falls back to each field's markup
+    // default for anything not saved yet — e.g. on a first visit).
+    restorePersistedSettings();
 
     // Apply all translations once for the initial language (also sets the "(recommended)"
     // suffix and the live readouts).
